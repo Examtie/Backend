@@ -4,7 +4,7 @@ BASE_URL = "http://127.0.0.1:8000"
 
 
 def register(email: str, password: str, full_name: str = None, roles: str = None):
-    payload = {"email": email, "password": password}
+    payload = {"email": email, "password": password, "username": email.split("@")[0]}
     if full_name:
         payload["full_name"] = full_name
     if roles:
@@ -17,7 +17,6 @@ def register(email: str, password: str, full_name: str = None, roles: str = None
 def login(username: str, password: str):
     data = {"username": username, "password": password}
     resp = requests.post(f"{BASE_URL}/token", data=data)
-    resp.raise_for_status()
     return resp.json()["access_token"]
 
 
@@ -37,18 +36,18 @@ def list_users(token: str):
 
 if __name__ == "__main__":
     # Example usage
-    #user = register("alice@example.com", "secret123", full_name="Alice", roles="admin")
-    #print("Registered:", user)
+    user = register("ddddvv@gomc.co", "dasdasdasd", full_name="Alicewang", roles="admin")
+    # #print("Registered:", user)
 
-    token = login("alice@example.com", "secret123")
-    print("Token:", token)
+    # token = login("aliceskibditoliet@gomc.co", "ddddddddd")
+    # print("Token:", token)
 
-    profile = get_profile(token)
-    print("Profile:", profile)
+    # profile = get_profile(token)
+    # print("Profile:", profile)
 
-    # If the user has admin role:
-    try:
-        admins = list_users(token)
-        print("All users:", admins)
-    except requests.HTTPError as e:
-        print("Not authorized to list users:", e)
+    # # If the user has admin role:
+    # try:
+    #     admins = list_users(token)
+    #     print("All users:", admins)
+    # except requests.HTTPError as e:
+    #     print("Not authorized to list users:", e)
