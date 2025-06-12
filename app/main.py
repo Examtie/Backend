@@ -13,6 +13,12 @@ from dependencies import get_current_user, require_roles, get_user_by_email, get
 
 app = FastAPI(title="Examtie Backend API", version="1.0.0")
 
+## ROUTER ##
+from admin import router as admin_router  # Adjust if needed
+
+app.include_router(admin_router)
+############
+
 @app.post("/register", response_model=UserOut)
 async def register(user_in: UserIn):
     if await get_user_by_email(user_in.email):
