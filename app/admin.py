@@ -1,15 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from bson import ObjectId
 from typing import List, Optional
-from app.database import users_collection, exams_collection, system_settings_collection
-from app.dependencies import require_roles
-from app.models import UserOut
+from database import users_collection, exams_collection, system_settings_collection
+from dependencies import require_roles
+from models import UserOut
 from datetime import datetime
 
-from settings import ALL_ROLES, ADMIN_ROLE
+from settings import ADMIN_ROLE
+from models import UpdateProfile
 
 router = APIRouter(
-    prefix="/admin",
+    prefix="/admin/api/v1",
     tags=["Admin"]
 )
 
@@ -58,6 +59,29 @@ async def delete_user(user_id: str, admin: dict = Depends(require_roles("admin")
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": "User deleted successfully"}
 
+@router.patch("/users/{user_id}")
+async def edit_any_user_profile(user_id: str, update: UpdateProfile, admin: dict = Depends(require_roles("admin"))):
+    update_data = {k: v for k, v in update.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided")
+
+    result = await users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": update_data}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    updated_user = await users_collection.find_one({"_id": ObjectId(user_id)})
+    return {
+        "id": str(updated_user["_id"]),
+        "email": updated_user["email"],
+        "username": updated_user["username"],
+        "full_name": updated_user.get("full_name", ""),
+        "roles": updated_user.get("roles", []),
+        "bio": updated_user.get("bio", ""),
+        "profile_image": updated_user.get("profile_image", "")
+    }
 
 # === EXAM MANAGEMENT ===
 
