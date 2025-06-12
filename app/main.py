@@ -4,14 +4,14 @@ from datetime import datetime
 from bson import ObjectId
 from typing import List
 
-from settings import ALL_ROLES
+from settings import ALL_ROLES, ADMIN_ROLE
 
 from models import UserIn, UserOut, Token, UpdateProfile
 from database import users_collection
 from auth import hash_password, verify_password, create_access_token
 from dependencies import get_current_user, require_roles, get_user_by_email, get_user_by_username
 
-app = FastAPI(title="FastAPI MongoDB Auth")
+app = FastAPI(title="Examtie Backend API", version="1.0.0")
 
 @app.post("/register", response_model=UserOut)
 async def register(user_in: UserIn):
@@ -83,7 +83,7 @@ async def update_profile(update: UpdateProfile, current_user: dict = Depends(get
     )
 
 @app.get("/admin/users", response_model=List[UserOut])
-async def list_users(admin: dict = Depends(require_roles("admin"))):
+async def list_users(admin: dict = Depends(require_roles(ADMIN_ROLE))):
     users = []
     async for u in users_collection.find():
         users.append(UserOut(
