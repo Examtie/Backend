@@ -4,10 +4,10 @@ from datetime import datetime
 from bson import ObjectId
 from typing import List
 
-from app.models import UserIn, UserOut, Token, UpdateProfile
-from app.database import users_collection
-from app.auth import hash_password, verify_password, create_access_token
-from app.dependencies import get_current_user, require_roles, get_user_by_email, get_user_by_username
+from models import UserIn, UserOut, Token, UpdateProfile
+from database import users_collection
+from auth import hash_password, verify_password, create_access_token
+from dependencies import get_current_user, require_roles, get_user_by_email, get_user_by_username
 
 app = FastAPI(title="FastAPI MongoDB Auth")
 
@@ -101,8 +101,3 @@ async def dashboard(user: dict = Depends(require_roles("user", "admin", "staff")
         "message": f"Welcome {user.get('email')}!",
         "roles": user.get("roles", [])
     }
-
-# Run locally
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

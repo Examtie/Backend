@@ -1,14 +1,18 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
-from .settings import SECRET_KEY, ALGORITHM
-from .models import TokenData
-from .database import users_collection
+from settings import SECRET_KEY, ALGORITHM
+from models import TokenData
+from database import users_collection
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
 
 async def get_user_by_email(email: str):
     return await users_collection.find_one({"email": email})
+
+async def get_user_by_username(username: str):
+    return await users_collection.find_one({"username": username})
+
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
