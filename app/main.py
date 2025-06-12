@@ -4,6 +4,8 @@ from datetime import datetime
 from bson import ObjectId
 from typing import List
 
+from settings import ALL_ROLES
+
 from models import UserIn, UserOut, Token, UpdateProfile
 from database import users_collection
 from auth import hash_password, verify_password, create_access_token
@@ -96,8 +98,9 @@ async def list_users(admin: dict = Depends(require_roles("admin"))):
     return users
 
 @app.get("/dashboard")
-async def dashboard(user: dict = Depends(require_roles("user", "admin", "staff"))):
+async def dashboard(user: dict = Depends(require_roles(ALL_ROLES))):
     return {
         "message": f"Welcome {user.get('email')}!",
         "roles": user.get("roles", [])
     }
+
