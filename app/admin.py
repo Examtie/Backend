@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from bson import ObjectId
 from typing import List, Optional
-from database import users_collection, exams_collection, system_settings_collection
+from database import users_collection, system_settings_collection
 from dependencies import require_roles
 from models import UserOut
 from datetime import datetime

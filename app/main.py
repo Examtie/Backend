@@ -1,64 +1,20 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from datetime import datetime
-from bson import ObjectId
-from typing import List
+from fastapi import FastAPI, Depends
 
-from settings import ALL_ROLES, ADMIN_ROLE
+from settings import ALL_ROLES
 
-from models import UserIn, UserOut, Token, UpdateProfile
+from models import UserOut,UpdateProfile
 from database import users_collection
-from auth import hash_password, verify_password, create_access_token
-from dependencies import get_current_user, require_roles, get_user_by_email, get_user_by_username
+from dependencies import get_current_user, require_roles, get_user_by_email
 
-app = FastAPI(title="Examtie Backend API", version="1.0.0")
+app = FastAPI(title="Examtie Backend API", version="1.0.0", description="Project NSC")
 
 ## ROUTER ##
-from admin import router as admin_router  # Adjust if needed
+from admin import router as admin_router
+from authention import router as auth_router
 
 app.include_router(admin_router)
+app.include_router(auth_router)
 ############
-
-@app.post("/register", response_model=UserOut)
-async def register(user_in: UserIn):
-    if await get_user_by_email(user_in.email):
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    if user_in.username and await get_user_by_username(user_in.username):
-        raise HTTPException(status_code=400, detail="Username already taken")
-
-    user_data = user_in.dict()
-    user_data.update({
-        "hashed_password": hash_password(user_data.pop("password")),
-        "created_at": datetime.utcnow(),
-        "bio": "New to Examtie!",
-        "profile_image": "https://jwt.io/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fjwt-flower.f20616b0.png&w=3840&q=75"
-    })
-
-    result = await users_collection.insert_one(user_data)
-    return UserOut(
-        id=str(result.inserted_id),
-        email=user_data["email"],
-        username=user_data["username"],
-        full_name=user_data["full_name"],
-        roles=user_data["roles"],
-        bio=user_data["bio"],
-        profile_image=user_data["profile_image"]
-    )
-
-@app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = await get_user_by_email(form_data.username)
-    if not user or not verify_password(form_data.password, user.get("hashed_password", "")):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = create_access_token(
-        data={"sub": user["email"], "roles": user.get("roles", [])}
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/users/me", response_model=UserOut)
 async def read_users_me(current_user: dict = Depends(get_current_user)):
@@ -88,20 +44,6 @@ async def update_profile(update: UpdateProfile, current_user: dict = Depends(get
         profile_image=updated_user.get("profile_image", "")
     )
 
-@app.get("/admin/users", response_model=List[UserOut])
-async def list_users(admin: dict = Depends(require_roles(ADMIN_ROLE))):
-    users = []
-    async for u in users_collection.find():
-        users.append(UserOut(
-            id=str(u["_id"]),
-            email=u["email"],
-            username=u["username"],
-            full_name=u.get("full_name", ""),
-            roles=u.get("roles", []),
-            bio=u.get("bio", ""),
-            profile_image=u.get("profile_image", "")
-        ))
-    return users
 
 @app.get("/dashboard")
 async def dashboard(user: dict = Depends(require_roles(ALL_ROLES))):
