@@ -1,1 +1,6 @@
-# uhm what the sigma
+# Run Development Server
+
+```
+cd app
+python -m uvicorn main:app --reload
+```

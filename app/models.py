@@ -1,7 +1,7 @@
 from typing import List, Optional, Literal
 from pydantic import BaseModel, EmailStr, Field, validator
 
-ALLOWED_ROLES = {"admin", "staff", "user"}
+from settings import ALL_ROLES
 
 class UserIn(BaseModel):
     email: EmailStr
@@ -12,8 +12,8 @@ class UserIn(BaseModel):
 
     @validator("roles", pre=True, each_item=True)
     def validate_roles(cls, v):
-        if v not in ALLOWED_ROLES:
-            raise ValueError(f"Role '{v}' is not allowed. Choose from {ALLOWED_ROLES}.")
+        if v not in ALL_ROLES:
+            raise ValueError(f"Role '{v}' is not allowed. Choose from {ALL_ROLES}.")
         return v
 
 class UserOut(BaseModel):
