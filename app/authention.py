@@ -9,7 +9,7 @@ from auth import hash_password, verify_password, create_access_token
 from dependencies import get_user_by_email, get_user_by_username
 
 router = APIRouter(
-    prefix="/Auth/api/v1",
+    prefix="/auth/api/v1",
     tags=["Authentication"]
 )
 
@@ -30,6 +30,9 @@ async def register(user_in: UserIn):
     })
 
     result = await users_collection.insert_one(user_data)
+    access_token = create_access_token(
+        data={"sub": user_data["email"], "roles": user_data["roles"]}
+    )
     return UserOut(
         id=str(result.inserted_id),
         email=user_data["email"],
@@ -37,7 +40,8 @@ async def register(user_in: UserIn):
         full_name=user_data["full_name"],
         roles=user_data["roles"],
         bio=user_data["bio"],
-        profile_image=user_data["profile_image"]
+        profile_image=user_data["profile_image"],
+        token=access_token
     )
 
 @router.post("/token", response_model=Token)

@@ -24,6 +24,7 @@ class UserOut(BaseModel):
     roles: List[str]
     bio: Optional[str] = ""
     profile_image: Optional[str] = ""
+    token: str
 
 class Token(BaseModel):
     access_token: str

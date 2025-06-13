@@ -1,6 +1,6 @@
 import requests,os 
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:8000/Auth/api/v1/"
 
 
 def register(email: str, password: str, full_name: str = None, roles: str = None):
