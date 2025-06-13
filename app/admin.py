@@ -5,6 +5,7 @@ from database import users_collection, system_settings_collection
 from dependencies import require_roles
 from models import UserOut
 from datetime import datetime
+from fastapi import Query
 
 from settings import ADMIN_ROLE
 from models import UpdateProfile
@@ -81,6 +82,39 @@ async def edit_any_user_profile(user_id: str, update: UpdateProfile, admin: dict
         "roles": updated_user.get("roles", []),
         "bio": updated_user.get("bio", ""),
         "profile_image": updated_user.get("profile_image", "")
+    }
+
+@router.get("/users/@data")
+async def get_user_detail(
+    user_id: Optional[str] = Query(None),
+    username: Optional[str] = Query(None),
+    admin: dict = Depends(require_roles("admin"))
+):
+    if not user_id and not username:
+        raise HTTPException(status_code=400, detail="Provide either 'user_id' or 'username'")
+
+    query = {}
+    if user_id:
+        try:
+            query["_id"] = ObjectId(user_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid user_id format")
+    elif username:
+        query["username"] = username
+
+    user = await users_collection.find_one(query)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "id": str(user["_id"]),
+        "email": user["email"],
+        "username": user["username"],
+        "full_name": user.get("full_name", ""),
+        "roles": user.get("roles", []),
+        "bio": user.get("bio", ""),
+        "profile_image": user.get("profile_image", ""),
+        "created_at": user.get("created_at")
     }
 
 # === EXAM MANAGEMENT ===
