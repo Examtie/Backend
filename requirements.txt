@@ -5,3 +5,4 @@ pydantic[email]
 motor
 passlib[bcrypt]
 python-jose[cryptography]
+python-multipart
