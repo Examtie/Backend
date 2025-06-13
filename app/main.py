@@ -1,17 +1,17 @@
 from fastapi import FastAPI, Depends
 
-from settings import ALL_ROLES
+from app.settings import ALL_ROLES
 
-from models import UserOut,UpdateProfile
-from database import users_collection
-from dependencies import get_current_user, require_roles, get_user_by_email
+from app.models import UserOut,UpdateProfile
+from app.database import users_collection
+from app.dependencies import get_current_user, require_roles, get_user_by_email
 
 app = FastAPI(title="Examtie Backend API", version="1.0.0", description="Project NSC")
 
 ## ROUTER ##
-from admin import router as admin_router
-from authention import router as auth_router
-from user import router as user_router
+from app.admin import router as admin_router
+from app.authention import router as auth_router
+from app.user import router as user_router
 
 app.include_router(admin_router)
 app.include_router(auth_router)

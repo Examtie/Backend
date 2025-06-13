@@ -1,7 +1,7 @@
 from typing import List, Optional, Literal
 from pydantic import BaseModel, EmailStr, Field, validator
 
-from settings import ALL_ROLES
+from app.settings import ALL_ROLES
 
 class UserIn(BaseModel):
     email: EmailStr

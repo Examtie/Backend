@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends
-from models import UserOut,UpdateProfile
-from database import users_collection
-from dependencies import get_current_user, require_roles, get_user_by_email
+from app.models import UserOut,UpdateProfile
+from app.database import users_collection
+from app.dependencies import get_current_user, require_roles, get_user_by_email
 
-from settings import ALL_ROLES
+from app.settings import ALL_ROLES
 
 router = APIRouter(
     prefix="/user/api/v1",

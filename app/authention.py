@@ -3,10 +3,10 @@ from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime
 
 
-from models import UserIn, UserOut, Token
-from database import users_collection
-from auth import hash_password, verify_password, create_access_token
-from dependencies import get_user_by_email, get_user_by_username
+from app.models import UserIn, UserOut, Token
+from app.database import users_collection
+from app.auth import hash_password, verify_password, create_access_token
+from app.dependencies import get_user_by_email, get_user_by_username
 
 router = APIRouter(
     prefix="/auth/api/v1",

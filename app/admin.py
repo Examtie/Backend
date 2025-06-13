@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from bson import ObjectId
 from typing import List, Optional
-from database import users_collection, system_settings_collection
-from dependencies import require_roles
-from models import UserOut
+from app.database import users_collection, system_settings_collection
+from app.dependencies import require_roles
+from app.models import UserOut
 from datetime import datetime
 from fastapi import Query
 
-from settings import ADMIN_ROLE
-from models import UpdateProfile
+from app.settings import ADMIN_ROLE
+from app.models import UpdateProfile
 
 router = APIRouter(
     prefix="/admin/api/v1",
