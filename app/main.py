@@ -8,6 +8,14 @@ from app.dependencies import get_current_user, require_roles, get_user_by_email
 
 app = FastAPI(title="Examtie Backend API", version="1.0.0", description="Project NSC")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
 ## ROUTER ##
 from app.admin import router as admin_router
 from app.authention import router as auth_router
