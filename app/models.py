@@ -30,6 +30,15 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+class MeReturn(BaseModel):
+    id: Optional[str] = None
+    email: EmailStr
+    full_name: str
+    username: str
+    roles: List[str]
+    bio: Optional[str] = ""
+    profile_image: Optional[str] = ""
+
 class TokenData(BaseModel):
     email: Optional[str] = None
     roles: List[Literal["user", "admin", "staff"]] = ["user"]

@@ -1,6 +1,6 @@
 import requests,os 
 
-BASE_URL = "http://127.0.0.1:8000/Auth/api/v1/"
+BASE_URL = "https://examtieapi.breadtm.xyz"
 
 
 def register(email: str, password: str, full_name: str = None, roles: str = None):
@@ -9,7 +9,7 @@ def register(email: str, password: str, full_name: str = None, roles: str = None
         payload["full_name"] = full_name
     if roles:
         payload["roles"] = ["admin"]
-    resp = requests.post(f"{BASE_URL}/register", json=payload)
+    resp = requests.post(f"{BASE_URL}/auth/api/v1/register", json=payload, verify=False)
     print(resp.json())
     return resp.json()
 
@@ -36,7 +36,7 @@ def list_users(token: str):
 
 if __name__ == "__main__":
     # Example usage
-    user = register("ddddvv@gomc.co", "dasdasdasd", full_name="Alicewang", roles="admin")
+    user = register("dlllll@go.com", "dasdasdasd", full_name="Alicewang", roles="admin")
     # #print("Registered:", user)
 
     # token = login("aliceskibditoliet@gomc.co", "ddddddddd")
