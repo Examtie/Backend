@@ -1,5 +1,6 @@
 from typing import List, Optional, Literal
 from pydantic import BaseModel, EmailStr, Field, validator
+from datetime import datetime
 
 from app.settings import ALL_ROLES
 
@@ -47,3 +48,22 @@ class UpdateProfile(BaseModel):
     full_name: Optional[str] = None
     bio: Optional[str] = None
     profile_image: Optional[str] = None
+
+class AdminUserOut(BaseModel):
+    id: Optional[str] = None
+    email: EmailStr
+    full_name: str
+    username: str
+    roles: List[str]
+    bio: Optional[str] = ""
+    profile_image: Optional[str] = ""
+    created_at: Optional[datetime] = None
+
+class UpdateUserRole(BaseModel):
+    role: Literal["user", "admin", "staff", "seller"]
+
+    @validator("role")
+    def validate_role(cls, v):
+        if v not in ALL_ROLES:
+            raise ValueError(f"Role '{v}' is not allowed. Choose from {ALL_ROLES}.")
+        return v
