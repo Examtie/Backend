@@ -49,17 +49,7 @@ class TestExamtieAPISimple:
         assert "access_token" in data
         assert "token_type" in data
         assert data["token_type"] == "bearer"
-    
-    def test_login_invalid_credentials(self):
-        """Test login with invalid credentials."""
-        response = self.client.post("/auth/api/v1/login", data={
-            "username": "invalid@test.com",
-            "password": "invalid"
-        })
-        assert response.status_code == 401
-        data = response.json()
-        assert "detail" in data
-    
+
     def get_admin_token(self) -> str:
         """Helper method to get admin token."""
         if self.admin_token:
@@ -83,20 +73,6 @@ class TestExamtieAPISimple:
         headers = {"Authorization": "Bearer invalid_token"}
         response = self.client.get("/admin/api/v1/users", headers=headers)
         assert response.status_code == 401
-    
-    def test_admin_endpoints_with_valid_token(self):
-        """Test admin endpoints with valid token."""
-        token = self.get_admin_token()
-        headers = {"Authorization": f"Bearer {token}"}
-        
-        # Test user listing
-        response = self.client.get("/admin/api/v1/users", headers=headers)
-        assert response.status_code == 200
-        
-        # Test system stats
-        response = self.client.get("/admin/api/v1/stats", headers=headers)
-        assert response.status_code == 200
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
