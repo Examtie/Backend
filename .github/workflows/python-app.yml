@@ -39,8 +39,7 @@ jobs:
         python setup_database.py
     - name: Start API server
       run: |
-        cd app
-        python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+        python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
         echo $! > server.pid
         sleep 10  # Give server time to start
     - name: Test with pytest
