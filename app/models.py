@@ -49,6 +49,25 @@ class UpdateProfile(BaseModel):
     bio: Optional[str] = None
     profile_image: Optional[str] = None
 
+<<<<<<< HEAD
+class ExamFileCreate(BaseModel):
+    title: str = Field(..., example="Midterm Physics")
+    description: str = Field(..., example="Grade 11 physics midterm")
+    tags: List[str] = Field(default_factory=list)
+
+class ExamFileUpdate(BaseModel):
+    title: Optional[str]
+    description: Optional[str]
+    tags: Optional[List[str]]
+
+class ExamFileOut(BaseModel):
+    id: str
+    title: str
+    description: str
+    tags: List[str]
+    url: str
+    uploaded_by: str
+=======
 class AdminUserOut(BaseModel):
     id: Optional[str] = None
     email: EmailStr
@@ -67,3 +86,4 @@ class UpdateUserRole(BaseModel):
         if v not in ALL_ROLES:
             raise ValueError(f"Role '{v}' is not allowed. Choose from {ALL_ROLES}.")
         return v
+>>>>>>> ee2f3fe19cb2d1c7d87d452834005e9b2d3515ea

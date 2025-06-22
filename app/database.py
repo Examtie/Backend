@@ -6,3 +6,4 @@ db = client[DATABASE_NAME]
 
 users_collection = db.get_collection("users")
 system_settings_collection = db.get_collection("system_settings")
+exam_files_collection = db.get_collection("exam_files")
