@@ -6,3 +6,10 @@ motor
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
+bcrypt
+requests
+boto3
+pytest
+httpx
+pytest-asyncio
+pymongo

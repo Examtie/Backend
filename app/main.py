@@ -29,4 +29,25 @@ app.include_router(user_router)
 
 @app.get("/")
 async def landing_api():
-    return {"niga56":"Server Running by Hamster!!"}
+    return {"message": "Examtie Backend API - Server is running", "status": "ok", "version": "1.0.0"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and CI/CD"""
+    try:
+        # Test database connection
+        await users_collection.count_documents({}, limit=1)
+        return {
+            "status": "healthy",
+            "message": "API is running and database is connected",
+            "version": "1.0.0",
+            "database": "connected"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "message": "Database connection failed",
+            "error": str(e),
+            "version": "1.0.0",
+            "database": "disconnected"
+        }

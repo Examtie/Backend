@@ -1,5 +1,5 @@
 from typing import List, Optional, Literal
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
 
 from app.settings import ALL_ROLES
@@ -10,10 +10,15 @@ class UserIn(BaseModel):
     full_name: str
     username: str = Field(min_length=3, max_length=30)
     roles: List[Literal["user", "admin", "staff"]] = ["user"]
-
-    @validator("roles", pre=True, each_item=True)
+    
+    @field_validator("roles", mode="before")
+    @classmethod
     def validate_roles(cls, v):
-        if v not in ALL_ROLES:
+        if isinstance(v, list):
+            for role in v:
+                if role not in ALL_ROLES:
+                    raise ValueError(f"Role '{role}' is not allowed. Choose from {ALL_ROLES}.")
+        elif v not in ALL_ROLES:
             raise ValueError(f"Role '{v}' is not allowed. Choose from {ALL_ROLES}.")
         return v
 
@@ -25,7 +30,7 @@ class UserOut(BaseModel):
     roles: List[str]
     bio: Optional[str] = ""
     profile_image: Optional[str] = ""
-    token: str
+    token: Optional[str] = None
 
 class Token(BaseModel):
     access_token: str
@@ -49,16 +54,15 @@ class UpdateProfile(BaseModel):
     bio: Optional[str] = None
     profile_image: Optional[str] = None
 
-<<<<<<< HEAD
 class ExamFileCreate(BaseModel):
-    title: str = Field(..., example="Midterm Physics")
-    description: str = Field(..., example="Grade 11 physics midterm")
+    title: str = Field(..., json_schema_extra={"example": "Midterm Physics"})
+    description: str = Field(..., json_schema_extra={"example": "Grade 11 physics midterm"})
     tags: List[str] = Field(default_factory=list)
 
 class ExamFileUpdate(BaseModel):
-    title: Optional[str]
-    description: Optional[str]
-    tags: Optional[List[str]]
+    title: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[List[str]] = None
 
 class ExamFileOut(BaseModel):
     id: str
@@ -67,7 +71,7 @@ class ExamFileOut(BaseModel):
     tags: List[str]
     url: str
     uploaded_by: str
-=======
+
 class AdminUserOut(BaseModel):
     id: Optional[str] = None
     email: EmailStr
@@ -80,10 +84,10 @@ class AdminUserOut(BaseModel):
 
 class UpdateUserRole(BaseModel):
     role: Literal["user", "admin", "staff", "seller"]
-
-    @validator("role")
+    
+    @field_validator("role")
+    @classmethod
     def validate_role(cls, v):
         if v not in ALL_ROLES:
             raise ValueError(f"Role '{v}' is not allowed. Choose from {ALL_ROLES}.")
         return v
->>>>>>> ee2f3fe19cb2d1c7d87d452834005e9b2d3515ea
