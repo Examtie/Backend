@@ -1,5 +1,5 @@
 from typing import List, Optional, Literal
-from pydantic import BaseModel, EmailStr, Field, field_validator, root_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from datetime import datetime
 
 from app.settings import ALL_ROLES
@@ -75,7 +75,7 @@ class ExamFileCreate(BaseModel):
     essay_count: int = Field(0, ge=0, description="จำนวนข้อเขียน")
     choice_count: int = Field(0, ge=0, description="จำนวนข้อกา")
 
-    @model_validator
+    @root_validator
     def at_least_one_question_type(cls, values):
         essay = values.get('essay_count', 0)
         choice = values.get('choice_count', 0)
