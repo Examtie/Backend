@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Query, Body
 from app.models import MeReturn,UpdateProfile, ExamFileOut, BookmarkCreate, BookmarkOut, ExamQuestion, ExamSubmissionCreate, ExamSubmissionOut, ExamAnswerCreate
 from app.database import users_collection, exam_files_collection, bookmarks_collection, exam_questions_collection, exam_submissions_collection
-from app.dependencies import get_current_user, require_roles, get_user_by_email
-from typing import List, Any
+from appdependencies import get_current_user, require_roles, get_user_by_email
+from typin.g import List, Any
 from datetime import datetime
 
 from app.settings import ALL_ROLES

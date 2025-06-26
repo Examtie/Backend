@@ -1,4 +1,4 @@
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Union
 from pydantic import BaseModel, EmailStr, Field, field_validator, root_validator
 from datetime import datetime
 
@@ -139,3 +139,30 @@ class BookmarkOut(BaseModel):
     user_id: str
     exam_id: str
     created_at: datetime
+
+class ExamQuestion(BaseModel):
+    id: str
+    type: Literal["multiple_choice", "fill", "essay"]
+    question: str
+    choices: Optional[List[str]] = None  # for multiple_choice
+    answer: Optional[Union[str, List[str]]] = None  # สำหรับเฉลย (admin)
+
+class ExamAnswerCreate(BaseModel):
+    question_id: str
+    answer: Union[str, List[str]]
+
+class ExamSubmissionCreate(BaseModel):
+    exam_id: str
+    answers: List[ExamAnswerCreate]
+
+class ExamAnswerOut(BaseModel):
+    question_id: str
+    answer: Union[str, List[str]]
+    is_correct: Optional[bool] = None
+
+class ExamSubmissionOut(BaseModel):
+    id: str
+    user_id: str
+    exam_id: str
+    answers: List[ExamAnswerOut]
+    submitted_at: datetime
