@@ -3,6 +3,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, root_validator
 from datetime import datetime
 
 from app.settings import ALL_ROLES
+from app.dependencies import get_current_user, require_roles, get_user_by_email
 
 class UserIn(BaseModel):
     email: EmailStr
