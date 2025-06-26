@@ -75,7 +75,7 @@ class ExamFileCreate(BaseModel):
     essay_count: int = Field(0, ge=0, description="จำนวนข้อเขียน")
     choice_count: int = Field(0, ge=0, description="จำนวนข้อกา")
 
-    @root_validator
+    @model_validator
     def at_least_one_question_type(cls, values):
         essay = values.get('essay_count', 0)
         choice = values.get('choice_count', 0)
@@ -91,7 +91,7 @@ class ExamFileUpdate(BaseModel):
     essay_count: Optional[int] = Field(None, ge=0, description="จำนวนข้อเขียน")
     choice_count: Optional[int] = Field(None, ge=0, description="จำนวนข้อกา")
 
-    @root_validator
+    @model_validator
     def at_least_one_question_type_update(cls, values):
         essay = values.get('essay_count')
         choice = values.get('choice_count')
