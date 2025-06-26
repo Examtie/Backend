@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from bson import ObjectId
 from typing import List, Optional
-from app.database import users_collection, system_settings_collection, exam_files_collection
+from app.database import users_collection, system_settings_collection, exam_files_collection, exam_categories_collection
 from app.dependencies import get_current_user, require_roles
-from app.models import UserOut, ExamFileCreate, ExamFileUpdate, ExamFileOut, UpdateProfile, AdminUserOut, UpdateUserRole
+from app.models import UserOut, ExamFileCreate, ExamFileUpdate, ExamFileOut, UpdateProfile, AdminUserOut, UpdateUserRole, ExamCategoryCreate, ExamCategoryUpdate, ExamCategoryOut
 from app.storage.r2_client import upload_to_r2
 from datetime import datetime
 from app.settings import ADMIN_ROLE, ALL_ROLES
@@ -204,6 +204,63 @@ async def edit_any_user_profile(user_id: str, update: UpdateProfile, admin: dict
             raise HTTPException(status_code=400, detail="Invalid user ID format")
         raise HTTPException(status_code=500, detail="Failed to update user profile")
 
+# === EXAM CATEGORY MANAGEMENT ===
+
+@router.post("/exam-categories", response_model=ExamCategoryOut)
+async def create_exam_category(
+    category: ExamCategoryCreate,
+    admin: dict = Depends(require_roles(ADMIN_ROLE))
+):
+    doc = category.dict()
+    result = await exam_categories_collection.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    return ExamCategoryOut(**doc)
+
+@router.get("/exam-categories", response_model=List[ExamCategoryOut])
+async def list_exam_categories(
+    admin: dict = Depends(require_roles(ADMIN_ROLE))
+):
+    categories = []
+    async for cat in exam_categories_collection.find():
+        categories.append(ExamCategoryOut(
+            id=str(cat["_id"]),
+            name=cat["name"],
+            description=cat.get("description", "")
+        ))
+    return categories
+
+@router.put("/exam-categories/{category_id}", response_model=ExamCategoryOut)
+async def update_exam_category(
+    category_id: str,
+    update: ExamCategoryUpdate,
+    admin: dict = Depends(require_roles(ADMIN_ROLE))
+):
+    update_dict = {k: v for k, v in update.dict().items() if v is not None}
+    if not update_dict:
+        raise HTTPException(status_code=400, detail="No data provided")
+    result = await exam_categories_collection.update_one(
+        {"_id": ObjectId(category_id)},
+        {"$set": update_dict}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Category not found")
+    updated = await exam_categories_collection.find_one({"_id": ObjectId(category_id)})
+    return ExamCategoryOut(
+        id=str(updated["_id"]),
+        name=updated["name"],
+        description=updated.get("description", "")
+    )
+
+@router.delete("/exam-categories/{category_id}")
+async def delete_exam_category(
+    category_id: str,
+    admin: dict = Depends(require_roles(ADMIN_ROLE))
+):
+    result = await exam_categories_collection.delete_one({"_id": ObjectId(category_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return {"message": "Category deleted successfully"}
+
 # === EXAM MANAGEMENT ===
 
 @router.post("/upload", response_model=ExamFileOut)
@@ -214,17 +271,18 @@ async def upload_exam_file(
     current_user=Depends(get_current_user)
 ):
     file_url = await upload_to_r2(file)
-
     record = {
         "title": meta.title,
         "description": meta.description,
         "tags": meta.tags,
+        "category_id": meta.category_id,
+        "essay_count": meta.essay_count,
+        "choice_count": meta.choice_count,
         "url": file_url,
         "uploaded_by": current_user["email"],
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow()
     }
-
     result = await exam_files_collection.insert_one(record)
     record["id"] = str(result.inserted_id)
     record["url"] = file_url
@@ -239,17 +297,14 @@ async def update_exam_file(
     update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
     if not update_dict:
         raise HTTPException(status_code=400, detail="No data provided")
-
     update_dict["updated_at"] = datetime.utcnow()
     try:
         result = await exam_files_collection.update_one(
             {"_id": ObjectId(file_id)},
             {"$set": update_dict}
         )
-
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="File not found")
-
         updated = await exam_files_collection.find_one({"_id": ObjectId(file_id)})
         return ExamFileOut(
             id=str(updated["_id"]),
@@ -257,7 +312,10 @@ async def update_exam_file(
             description=updated["description"],
             tags=updated["tags"],
             url=updated["url"],
-            uploaded_by=updated["uploaded_by"]
+            uploaded_by=updated["uploaded_by"],
+            category_id=updated["category_id"],
+            essay_count=updated["essay_count"],
+            choice_count=updated["choice_count"]
         )
     except Exception as e:
         if "invalid" in str(e).lower():
@@ -279,7 +337,10 @@ async def list_exam_files(
             description=file_doc["description"],
             tags=file_doc.get("tags", []),
             url=file_doc["url"],
-            uploaded_by=file_doc["uploaded_by"]
+            uploaded_by=file_doc["uploaded_by"],
+            category_id=file_doc["category_id"],
+            essay_count=file_doc["essay_count"],
+            choice_count=file_doc["choice_count"]
         ))
     return files
 
@@ -297,6 +358,46 @@ async def delete_exam_file(
         if "invalid" in str(e).lower():
             raise HTTPException(status_code=400, detail="Invalid file ID format")
         raise HTTPException(status_code=500, detail="Failed to delete exam file")
+
+@router.get("/exam-files/by-category/{category_id}", response_model=List[ExamFileOut])
+async def get_exam_files_by_category(
+    category_id: str,
+    admin: dict = Depends(require_roles(ADMIN_ROLE)),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(10, ge=1, le=100, description="Items per page")
+):
+    skip = (page - 1) * limit
+    files = []
+    async for file_doc in exam_files_collection.find({"category_id": category_id}).skip(skip).limit(limit):
+        files.append(ExamFileOut(
+            id=str(file_doc["_id"]),
+            title=file_doc["title"],
+            description=file_doc["description"],
+            tags=file_doc.get("tags", []),
+            url=file_doc["url"],
+            uploaded_by=file_doc["uploaded_by"],
+            category_id=file_doc["category_id"],
+            essay_count=file_doc["essay_count"],
+            choice_count=file_doc["choice_count"]
+        ))
+    return files
+
+@router.get("/exam-files/all", response_model=List[ExamFileOut])
+async def get_all_exam_files(admin: dict = Depends(require_roles(ADMIN_ROLE))):
+    files = []
+    async for file_doc in exam_files_collection.find():
+        files.append(ExamFileOut(
+            id=str(file_doc["_id"]),
+            title=file_doc["title"],
+            description=file_doc["description"],
+            tags=file_doc.get("tags", []),
+            url=file_doc["url"],
+            uploaded_by=file_doc["uploaded_by"],
+            category_id=file_doc["category_id"],
+            essay_count=file_doc["essay_count"],
+            choice_count=file_doc["choice_count"]
+        ))
+    return files
 
 # === SYSTEM STATS ===
 

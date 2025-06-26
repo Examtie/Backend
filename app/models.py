@@ -1,5 +1,5 @@
 from typing import List, Optional, Literal
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, root_validator
 from datetime import datetime
 
 from app.settings import ALL_ROLES
@@ -54,15 +54,51 @@ class UpdateProfile(BaseModel):
     bio: Optional[str] = None
     profile_image: Optional[str] = None
 
+class ExamCategoryCreate(BaseModel):
+    name: str = Field(..., example="วิทยาศาสตร์")
+    description: Optional[str] = Field(None, example="หมวดวิชาวิทยาศาสตร์")
+
+class ExamCategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+class ExamCategoryOut(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+
 class ExamFileCreate(BaseModel):
     title: str = Field(..., json_schema_extra={"example": "Midterm Physics"})
     description: str = Field(..., json_schema_extra={"example": "Grade 11 physics midterm"})
     tags: List[str] = Field(default_factory=list)
+    category_id: str = Field(..., example="category_id")
+    essay_count: int = Field(0, ge=0, description="จำนวนข้อเขียน")
+    choice_count: int = Field(0, ge=0, description="จำนวนข้อกา")
+
+    @root_validator
+    def at_least_one_question_type(cls, values):
+        essay = values.get('essay_count', 0)
+        choice = values.get('choice_count', 0)
+        if (essay < 1 and choice < 1):
+            raise ValueError('ต้องมีอย่างน้อย 1 ใน 2 (essay_count หรือ choice_count) ที่เป็น 1 ขึ้นไป')
+        return values
 
 class ExamFileUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     tags: Optional[List[str]] = None
+    category_id: Optional[str] = None
+    essay_count: Optional[int] = Field(None, ge=0, description="จำนวนข้อเขียน")
+    choice_count: Optional[int] = Field(None, ge=0, description="จำนวนข้อกา")
+
+    @root_validator
+    def at_least_one_question_type_update(cls, values):
+        essay = values.get('essay_count')
+        choice = values.get('choice_count')
+        if essay is not None or choice is not None:
+            if (essay or 0) < 1 and (choice or 0) < 1:
+                raise ValueError('ต้องมีอย่างน้อย 1 ใน 2 (essay_count หรือ choice_count) ที่เป็น 1 ขึ้นไป')
+        return values
 
 class ExamFileOut(BaseModel):
     id: str
@@ -71,6 +107,9 @@ class ExamFileOut(BaseModel):
     tags: List[str]
     url: str
     uploaded_by: str
+    category_id: str
+    essay_count: int
+    choice_count: int
 
 class AdminUserOut(BaseModel):
     id: Optional[str] = None
@@ -91,3 +130,12 @@ class UpdateUserRole(BaseModel):
         if v not in ALL_ROLES:
             raise ValueError(f"Role '{v}' is not allowed. Choose from {ALL_ROLES}.")
         return v
+
+class BookmarkCreate(BaseModel):
+    exam_id: str
+
+class BookmarkOut(BaseModel):
+    id: str
+    user_id: str
+    exam_id: str
+    created_at: datetime

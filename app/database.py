@@ -7,3 +7,7 @@ db = client[DATABASE_NAME]
 users_collection = db.get_collection("users")
 system_settings_collection = db.get_collection("system_settings")
 exam_files_collection = db.get_collection("exam_files")
+exam_categories_collection = db.get_collection("exam_categories")
+bookmarks_collection = db.get_collection("bookmarks")
+exam_questions_collection = db.get_collection("exam_questions")
+exam_submissions_collection = db.get_collection("exam_submissions")

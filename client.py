@@ -9,11 +9,7 @@ def register(email: str, password: str, full_name: str = None, roles: str = None
         payload["full_name"] = full_name
     if roles:
         payload["roles"] = ["admin"]
-<<<<<<< HEAD
-    resp = requests.post(f"{BASE_URL}/auth/api/v1/register", json=payload)
-=======
     resp = requests.post(f"{BASE_URL}/auth/api/v1/register", json=payload, verify=False)
->>>>>>> ee2f3fe19cb2d1c7d87d452834005e9b2d3515ea
     print(resp.json())
     return resp.json()
 
@@ -40,11 +36,7 @@ def list_users(token: str):
 
 if __name__ == "__main__":
     # Example usage
-<<<<<<< HEAD
-    user = register("urmomomy@gomc.co", "dasdasdasd", full_name="Alicewang", roles="admin")
-=======
     user = register("dlllll@go.com", "dasdasdasd", full_name="Alicewang", roles="admin")
->>>>>>> ee2f3fe19cb2d1c7d87d452834005e9b2d3515ea
     # #print("Registered:", user)
 
     # token = login("aliceskibditoliet@gomc.co", "ddddddddd")
