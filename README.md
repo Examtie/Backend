@@ -2,7 +2,7 @@
 
 A comprehensive FastAPI-based backend for the Examtie platform with user management, admin functionality, and quiz operations.
 
-## Postma colletio
+## Postman colletion
 
 https://botfin.postman.co/workspace/Regenxzz~d8dcf619-2b2f-45ed-a891-7c8b56d2d323/collection/27322087-68e42c25-f1b0-48ec-8d74-3e802c0efdb3?action=share&creator=27322087
 
