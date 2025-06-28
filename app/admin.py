@@ -334,8 +334,8 @@ async def update_exam_file(
             tags=updated["tags"],
             url=updated["url"],
             uploaded_by=updated["uploaded_by"],
-            essay_count=updated["essay_count"],
-            choice_count=updated["choice_count"]
+            essay_count=updated.get("essay_count", 0),
+            choice_count=updated.get("choice_count", 0)
         )
     except Exception as e:
         if "invalid" in str(e).lower():
@@ -358,8 +358,8 @@ async def list_exam_files(
             tags=file_doc.get("tags", []),
             url=file_doc["url"],
             uploaded_by=file_doc["uploaded_by"],
-            essay_count=file_doc["essay_count"],
-            choice_count=file_doc["choice_count"]
+            essay_count=file_doc.get("essay_count", 0),
+            choice_count=file_doc.get("choice_count", 0)
         ))
     return files
 
@@ -396,8 +396,8 @@ async def get_exam_files_by_category(
             tags=file_doc.get("tags", []),
             url=file_doc["url"],
             uploaded_by=file_doc["uploaded_by"],
-            essay_count=file_doc["essay_count"],
-            choice_count=file_doc["choice_count"]
+            essay_count=file_doc.get("essay_count", 0),
+            choice_count=file_doc.get("choice_count", 0)
         ))
     return files
 
@@ -412,8 +412,8 @@ async def get_all_exam_files(admin: dict = Depends(require_roles(ADMIN_ROLE))):
             tags=file_doc.get("tags", []),
             url=file_doc["url"],
             uploaded_by=file_doc["uploaded_by"],
-            essay_count=file_doc["essay_count"],
-            choice_count=file_doc["choice_count"]
+            essay_count=file_doc.get("essay_count", 0),
+            choice_count=file_doc.get("choice_count", 0)
         ))
     return files
 
