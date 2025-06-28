@@ -2,9 +2,34 @@
 
 A comprehensive FastAPI-based backend for the Examtie platform with user management, admin functionality, and quiz operations.
 
-## Postman colletion
+## Postman collection
 
 https://botfin.postman.co/workspace/Regenxzz~d8dcf619-2b2f-45ed-a891-7c8b56d2d323/collection/27322087-68e42c25-f1b0-48ec-8d74-3e802c0efdb3?action=share&creator=27322087
+
+## Api Docs
+
+https://examtieapi.breadtm.xyz/docs
+
+## Quick Start
+
+### Development Server
+
+```bash
+pip install -r requirements.txt
+python -m uvicorn app.main:app --reload
+```
+
+### Using Docker
+
+```bash
+docker build -t examtie-backend .
+docker run -p 8000:8000 examtie-backend
+```
+
+## Testing
+```bash
+pytest
+```
 
 ## Features
 
@@ -15,112 +40,11 @@ https://botfin.postman.co/workspace/Regenxzz~d8dcf619-2b2f-45ed-a891-7c8b56d2d32
 - 🔒 **Security**: Input validation, rate limiting, and secure password handling
 - 📁 **File Storage**: Cloudflare R2 integration for file uploads
 - 🧪 **Comprehensive Testing**: Multiple test suites with CI/CD integration
-
-## Quick Start
-
-### Development Server
-
-```bash
-cd Backend
-pip install -r requirements.txt
-python setup_database.py  # Initialize database
-cd app
-python -m uvicorn main:app --reload
-```
-
-### Using Docker
-
-```bash
-cd Backend
-docker build -t examtie-backend .
-docker run -p 8000:8000 examtie-backend
-```
-
-## Testing
-
-### Quick Test Run
-```bash
-./test_runner.sh  # Comprehensive test with server startup
-```
-
-### Run All Tests
-```bash
-./run_all_tests.sh  # All test suites
-```
-
-### Individual Test Suites
-```bash
-# Basic API tests (non-async, fast)
-python -m pytest tests/test_api_simple.py::TestExamtieAPISimple::test_root_endpoint -v
-python -m pytest tests/test_api_simple.py::TestExamtieAPISimple::test_unauthorized_access -v
-
-# Integration tests (requires running server)
-python tests/test_final_admin.py
-
-# Legacy comprehensive tests
-python tests/test_comprehensive_admin.py
-
-# Performance and security tests
-python tests/test_api_performance.py
-python tests/test_api_security.py
-
-# PyTest-based tests (may have async issues with Motor/MongoDB)
-python -m pytest tests/test_api_pytest.py -v
-```
-
-## CI/CD Pipeline
-
-This project includes a comprehensive GitHub Actions workflow (`.github/workflows/ci.yml`) that:
-
-- **Multi-Python Version Testing**: Tests against Python 3.9, 3.10, and 3.11
-- **MongoDB Service**: Runs tests against a real MongoDB instance
-- **Comprehensive Test Suite**: Runs all test suites and generates reports
-- **Security Scanning**: Bandit security analysis and dependency vulnerability checks
-- **Code Quality**: Black formatting, Flake8 linting, and MyPy type checking
-- **Artifact Collection**: Saves test results and security reports
-
-### CI/CD Features
-
-1. **Automated Testing**: All tests run on every push and pull request
-2. **Test Isolation**: Each test suite runs in isolation with proper cleanup
-3. **Result Artifacts**: Test results and logs are saved for review
-4. **Security Checks**: Automated security scanning with Bandit and Safety
-5. **Code Quality**: Automated code formatting and linting checks
-
+  
 ## CI/CD
 
 ### GitHub Actions
-The project includes comprehensive CI/CD with GitHub Actions:
-
-- 🧪 **Automated Testing**: Runs on Python 3.9, 3.10, and 3.11
-- 🔒 **Security Scanning**: Bandit and Safety checks
-- 🐳 **Docker Build**: Automated container builds
-- 🚀 **Deployment**: Staging and production deployment workflows
-
-### Workflows
-- **Backend CI/CD** (`.github/workflows/backend.yml`):
-  - Unit tests with MongoDB service
-  - Integration tests with live server
-  - Security vulnerability scanning
-  - Docker image building
-  - Automated deployment pipelines
-
-### Running CI Tests Locally
-```bash
-# Install dependencies
-pip install -r requirements.txt
-pip install bandit safety flake8
-
-# Run linting
-flake8 app/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
-
-# Run security scans
-bandit -r app/ --severity-level medium
-safety check --file requirements.txt
-
-# Run full test suite
-./test_runner.sh
-```
+Testing with `pytest`
 
 ## API Endpoints
 
@@ -158,49 +82,6 @@ R2_ACCOUNT_ID=your-account-id
 R2_ACCESS_KEY_ID=your-access-key
 R2_SECRET_ACCESS_KEY=your-secret-key
 R2_BUCKET_NAME=your-bucket-name
-```
-
-## Database Setup
-
-```bash
-python setup_database.py
-```
-
-This creates:
-- Admin user: `admin@admin.com` / `admin@admin.com`
-- Test users and sample data
-
-## Project Structure
-
-```
-Backend/
-├── app/
-│   ├── main.py          # FastAPI application
-│   ├── models.py        # Pydantic models
-│   ├── database.py      # MongoDB connection
-│   ├── auth.py          # Authentication logic
-│   ├── admin.py         # Admin endpoints
-│   ├── user.py          # User endpoints
-│   └── storage/         # File storage integration
-├── tests/               # Test suites
-├── requirements.txt     # Dependencies
-└── Dockerfile          # Container configuration
-```
-
-## Development
-
-### Setup Development Environment
-```bash
-./setup_dev_environment.sh
-```
-
-### Running Tests Locally
-```bash
-# Start the server
-uvicorn app.main:app --reload
-
-# In another terminal, run tests
-./run_all_tests_comprehensive.sh
 ```
 
 ## Notes
