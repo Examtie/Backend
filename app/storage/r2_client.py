@@ -28,10 +28,6 @@ else:
     BUCKET = None
 
 async def upload_to_r2(file: UploadFile) -> str:
-    if not R2_CONFIGURED:
-        # Return a mock URL for testing/development
-        file_id = f"{uuid.uuid4()}_{file.filename}"
-        return f"https://mock-storage.example.com/{file_id}"
     
     try:
         file_id = f"{uuid.uuid4()}_{file.filename}"
@@ -41,6 +37,6 @@ async def upload_to_r2(file: UploadFile) -> str:
             file_id,
             ExtraArgs={"ACL": "public-read"}  # Optional: make file public
         )
-        return f"{os.getenv('R2_ENDPOINT_URL')}/{BUCKET}/{file_id}"
+        return f"{os.getenv('R2_ENDPOINT_URL')}/{file_id}"
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
