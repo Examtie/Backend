@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form
 from bson import ObjectId
 from typing import List, Optional
 from app.database import users_collection, system_settings_collection, exam_files_collection, exam_categories_collection
@@ -7,6 +7,7 @@ from app.models import UserOut, ExamFileCreate, ExamFileUpdate, ExamFileOut, Upd
 from app.storage.r2_client import upload_to_r2
 from datetime import datetime
 from app.settings import ADMIN_ROLE, ALL_ROLES
+import json
 
 router = APIRouter(
     prefix="/admin/api/v1",
@@ -211,6 +212,10 @@ async def create_exam_category(
     category: ExamCategoryCreate,
     admin: dict = Depends(require_roles(ADMIN_ROLE))
 ):
+    # Check for duplicate category name (case-insensitive)
+    existing = await exam_categories_collection.find_one({"name": {"$regex": f"^{category.name}$", "$options": "i"}})
+    if existing:
+        raise HTTPException(status_code=400, detail="Category name already exists.")
     doc = category.dict()
     result = await exam_categories_collection.insert_one(doc)
     doc["id"] = str(result.inserted_id)
@@ -266,18 +271,34 @@ async def delete_exam_category(
 @router.post("/upload", response_model=ExamFileOut)
 async def upload_exam_file(
     file: UploadFile = File(...),
-    meta: ExamFileCreate = Depends(),
+    title: str = Form(...),
+    description: str = Form(...),
+    tags: str = Form(...),  # This will be the list of category IDs
+    essay_count: int = Form(...),
+    choice_count: int = Form(...),
     admin=Depends(require_roles(ADMIN_ROLE)),
     current_user=Depends(get_current_user)
 ):
+    # Parse tags (accept comma-separated or JSON array)
+    try:
+        if tags.strip().startswith("["):
+            tags_list = json.loads(tags)
+        else:
+            tags_list = [t.strip() for t in tags.split(",") if t.strip()]
+    except Exception:
+        tags_list = []
+
+    # Validate at least one question type
+    if (int(essay_count) < 1 and int(choice_count) < 1):
+        raise HTTPException(status_code=400, detail="ต้องมีอย่างน้อย 1 ใน 2 (essay_count หรือ choice_count) ที่เป็น 1 ขึ้นไป")
+
     file_url = await upload_to_r2(file)
     record = {
-        "title": meta.title,
-        "description": meta.description,
-        "tags": meta.tags,
-        "category_id": meta.category_id,
-        "essay_count": meta.essay_count,
-        "choice_count": meta.choice_count,
+        "title": title,
+        "description": description,
+        "tags": tags_list,  # Store category IDs here
+        "essay_count": int(essay_count),
+        "choice_count": int(choice_count),
         "url": file_url,
         "uploaded_by": current_user["email"],
         "created_at": datetime.utcnow(),
@@ -313,7 +334,6 @@ async def update_exam_file(
             tags=updated["tags"],
             url=updated["url"],
             uploaded_by=updated["uploaded_by"],
-            category_id=updated["category_id"],
             essay_count=updated["essay_count"],
             choice_count=updated["choice_count"]
         )
@@ -338,7 +358,6 @@ async def list_exam_files(
             tags=file_doc.get("tags", []),
             url=file_doc["url"],
             uploaded_by=file_doc["uploaded_by"],
-            category_id=file_doc["category_id"],
             essay_count=file_doc["essay_count"],
             choice_count=file_doc["choice_count"]
         ))
@@ -368,7 +387,8 @@ async def get_exam_files_by_category(
 ):
     skip = (page - 1) * limit
     files = []
-    async for file_doc in exam_files_collection.find({"category_id": category_id}).skip(skip).limit(limit):
+    # Find files where category_id is in tags
+    async for file_doc in exam_files_collection.find({"tags": category_id}).skip(skip).limit(limit):
         files.append(ExamFileOut(
             id=str(file_doc["_id"]),
             title=file_doc["title"],
@@ -376,7 +396,6 @@ async def get_exam_files_by_category(
             tags=file_doc.get("tags", []),
             url=file_doc["url"],
             uploaded_by=file_doc["uploaded_by"],
-            category_id=file_doc["category_id"],
             essay_count=file_doc["essay_count"],
             choice_count=file_doc["choice_count"]
         ))
@@ -393,7 +412,6 @@ async def get_all_exam_files(admin: dict = Depends(require_roles(ADMIN_ROLE))):
             tags=file_doc.get("tags", []),
             url=file_doc["url"],
             uploaded_by=file_doc["uploaded_by"],
-            category_id=file_doc["category_id"],
             essay_count=file_doc["essay_count"],
             choice_count=file_doc["choice_count"]
         ))

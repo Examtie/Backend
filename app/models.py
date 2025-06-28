@@ -72,23 +72,21 @@ class ExamFileCreate(BaseModel):
     title: str = Field(..., json_schema_extra={"example": "Midterm Physics"})
     description: str = Field(..., json_schema_extra={"example": "Grade 11 physics midterm"})
     tags: List[str] = Field(default_factory=list)
-    category_id: str = Field(..., example="category_id")
     essay_count: int = Field(0, ge=0, description="จำนวนข้อเขียน")
     choice_count: int = Field(0, ge=0, description="จำนวนข้อกา")
 
     @model_validator(mode="after")
-    def at_least_one_question_type(cls, values):
-        essay = values.get('essay_count', 0)
-        choice = values.get('choice_count', 0)
+    def at_least_one_question_type(self):
+        essay = getattr(self, 'essay_count', 0)
+        choice = getattr(self, 'choice_count', 0)
         if (essay < 1 and choice < 1):
             raise ValueError('ต้องมีอย่างน้อย 1 ใน 2 (essay_count หรือ choice_count) ที่เป็น 1 ขึ้นไป')
-        return values
+        return self
 
 class ExamFileUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     tags: Optional[List[str]] = None
-    category_id: Optional[str] = None
     essay_count: Optional[int] = Field(None, ge=0, description="จำนวนข้อเขียน")
     choice_count: Optional[int] = Field(None, ge=0, description="จำนวนข้อกา")
 
@@ -108,7 +106,6 @@ class ExamFileOut(BaseModel):
     tags: List[str]
     url: str
     uploaded_by: str
-    category_id: str
     essay_count: int
     choice_count: int
 
