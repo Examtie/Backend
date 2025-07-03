@@ -4,7 +4,11 @@ from jose import jwt, JWTError
 from app.settings import SECRET_KEY, ALGORITHM
 from app.database import users_collection
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/token",
+    scheme_name="Bearer Token",
+    description="Enter your JWT token here"
+)
 
 async def get_user_by_email(email: str):
     return await users_collection.find_one({"email": email})
@@ -30,6 +34,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credentials_exception
 
+    if token_data.email is None:
+        raise credentials_exception
     user = await get_user_by_email(token_data.email)
     if not user:
         raise credentials_exception
