@@ -223,19 +223,6 @@ async def create_exam_category(
     doc["id"] = str(result.inserted_id)
     return ExamCategoryOut(**doc)
 
-@router.get("/exam-categories", response_model=List[ExamCategoryOut])
-async def list_exam_categories(
-    admin: dict = Depends(require_roles(ADMIN_ROLE))
-):
-    categories = []
-    async for cat in exam_categories_collection.find():
-        categories.append(ExamCategoryOut(
-            id=str(cat["_id"]),
-            name=cat["name"],
-            description=cat.get("description", "")
-        ))
-    return categories
-
 @router.put("/exam-categories/{category_id}", response_model=ExamCategoryOut)
 async def update_exam_category(
     category_id: str,
