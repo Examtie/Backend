@@ -63,11 +63,12 @@ async def user_list_exams(
             tags=file_doc.get("tags", []),
             url=file_doc["url"],
             uploaded_by=file_doc["uploaded_by"],
-            category_id=file_doc["category_id"],
-            essay_count=file_doc["essay_count"],
-            choice_count=file_doc["choice_count"]
+            essay_count=file_doc.get("essay_count", 0),
+            choice_count=file_doc.get("choice_count", 0)
         ))
     return files
+
+
 
 @router.get("/exams/by-category/{category_id}", response_model=List[ExamFileOut])
 async def user_list_exams_by_category(
