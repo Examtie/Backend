@@ -8,24 +8,74 @@ load_dotenv()
 
 # Check if R2 is configured
 R2_CONFIGURED = bool(
-    os.getenv("R2_ENDPOINT_URL") and 
     os.getenv("R2_ACCESS_KEY") and 
     os.getenv("R2_SECRET_KEY") and 
     os.getenv("R2_BUCKET_NAME")
 )
 
 if R2_CONFIGURED:
-    r2 = boto3.client(
-        "s3",
-        region_name=os.getenv("R2_REGION", "auto"),
-        endpoint_url=os.getenv("R2_ENDPOINT_URL"),
-        aws_access_key_id=os.getenv("R2_ACCESS_KEY"),
-        aws_secret_access_key=os.getenv("R2_SECRET_KEY"),
-    )
-    BUCKET = os.getenv("R2_BUCKET_NAME")
+    # Get the S3 endpoint URL - this should be the account-specific endpoint
+    s3_endpoint = os.getenv("R2_ENDPOINT_URL")
+    
+    # Extract account ID from the endpoint if needed
+    account_id = os.getenv("R2_ACCOUNT_ID")
+    if not account_id and s3_endpoint and "r2.cloudflarestorage.com" in s3_endpoint:
+        # Extract account ID from URL like https://account_id.r2.cloudflarestorage.com
+        import re
+        match = re.search(r'https://([a-f0-9]{32})\.r2\.cloudflarestorage\.com', s3_endpoint)
+        if match:
+            account_id = match.group(1)
+            print(f"Extracted Account ID from endpoint: {account_id}")
+    
+    if not s3_endpoint:
+        if account_id:
+            s3_endpoint = f"https://{account_id}.r2.cloudflarestorage.com"
+        else:
+            print("ERROR: No R2_ENDPOINT_URL provided and cannot determine account ID")
+            s3_endpoint = "https://r2.cloudflarestorage.com"
+    
+    try:
+        r2 = boto3.client(
+            "s3",
+            region_name=os.getenv("R2_REGION", "auto"),
+            endpoint_url=s3_endpoint,
+            aws_access_key_id=os.getenv("R2_ACCESS_KEY"),
+            aws_secret_access_key=os.getenv("R2_SECRET_KEY"),
+        )
+        BUCKET = os.getenv("R2_BUCKET_NAME")
+        
+        # For public access, we'll use the bucket's public domain if available
+        # Otherwise construct it from the account ID
+        public_domain = os.getenv("R2_PUBLIC_DOMAIN")
+        if public_domain:
+            PUBLIC_ENDPOINT = f"https://{public_domain}"
+        elif account_id:
+            # Use the standard public R2 URL format
+            PUBLIC_ENDPOINT = f"https://pub-{account_id[:16]}.r2.dev"
+        else:
+            PUBLIC_ENDPOINT = None
+        
+        S3_ENDPOINT = s3_endpoint
+        
+        print(f"R2 Configuration initialized:")
+        print(f"  S3 Endpoint: {s3_endpoint}")
+        print(f"  Public Endpoint: {PUBLIC_ENDPOINT}")
+        print(f"  Bucket: {BUCKET}")
+        print(f"  Account ID: {account_id}")
+        
+    except Exception as e:
+        print(f"Error initializing R2 client: {e}")
+        r2 = None
+        BUCKET = None
+        PUBLIC_ENDPOINT = None
+        S3_ENDPOINT = None
+        R2_CONFIGURED = False
 else:
     r2 = None
     BUCKET = None
+    PUBLIC_ENDPOINT = None
+    S3_ENDPOINT = None
+    print("R2 not configured - missing required environment variables")
 
 async def upload_to_r2(file: UploadFile) -> str:
     if not R2_CONFIGURED:
@@ -52,14 +102,17 @@ async def upload_to_r2(file: UploadFile) -> str:
             ExtraArgs={"ACL": "public-read"}  # Optional: make file public
         )
         
-        # Construct the public URL - adjust this based on your R2 domain setup
-        endpoint_url = os.getenv('R2_ENDPOINT_URL')
-        if endpoint_url:
-            # Remove protocol and add file path
-            domain = endpoint_url.replace('https://', '').replace('http://', '')
-            return f"https://{domain}/{file_id}"
+        # Construct the public URL for the uploaded file
+        if PUBLIC_ENDPOINT:
+            return f"{PUBLIC_ENDPOINT}/{file_id}"
         else:
-            return f"https://{BUCKET}.r2.cloudflarestorage.com/{file_id}"
+            # Use a direct approach with the bucket name
+            # For R2, you can access files via: https://<bucket-name>.<account-id>.r2.cloudflarestorage.com/<file-id>
+            if account_id:
+                return f"https://{BUCKET}.{account_id}.r2.cloudflarestorage.com/{file_id}"
+            else:
+                # Fallback - this might not work but provides a URL
+                return f"https://{BUCKET}.r2.cloudflarestorage.com/{file_id}"
             
     except Exception as e:
         error_msg = str(e)
