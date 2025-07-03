@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query, Body, HTTPException
-from app.models import MeReturn,UpdateProfile, ExamFileOut, BookmarkCreate, BookmarkOut, ExamQuestion, ExamSubmissionCreate, ExamSubmissionOut, ExamAnswerCreate
-from app.database import users_collection, exam_files_collection, bookmarks_collection, exam_questions_collection, exam_submissions_collection
+from bson import ObjectId
+from app.models import MeReturn, UpdateProfile, ExamFileOut, BookmarkCreate, BookmarkOut, ExamQuestion, ExamSubmissionCreate, ExamSubmissionOut, ExamAnswerCreate, ExamCategoryOut
+from app.database import users_collection, exam_files_collection, bookmarks_collection, exam_questions_collection, exam_submissions_collection, exam_categories_collection
 from app.dependencies import get_current_user, require_roles, get_user_by_email
 from typing import List, Any
 from datetime import datetime
@@ -153,3 +154,30 @@ async def submit_exam(
     }
     result = await exam_submissions_collection.insert_one(doc)
     return {"submission_id": str(result.inserted_id), "exam_id": exam_id}
+
+# === EXAM CATEGORY MANAGEMENT FOR USERS ===
+@router.get("/exam-categories", response_model=List[ExamCategoryOut])
+async def user_list_exam_categories():
+    categories = []
+    async for cat in exam_categories_collection.find():
+        categories.append(ExamCategoryOut(
+            id=str(cat["_id"]),
+            name=cat["name"],
+            description=cat.get("description", "")
+        ))
+    return categories
+
+@router.get("/exam-categories/{category_id}", response_model=ExamCategoryOut)
+async def user_get_exam_category(category_id: str):
+    try:
+        oid = ObjectId(category_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid category ID format")
+    cat = await exam_categories_collection.find_one({"_id": oid})
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return ExamCategoryOut(
+        id=str(cat["_id"]),
+        name=cat["name"],
+        description=cat.get("description", "")
+    )
