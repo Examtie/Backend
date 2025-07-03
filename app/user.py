@@ -64,7 +64,6 @@ async def user_list_exams(
             url=file_doc["url"],
             uploaded_by=file_doc["uploaded_by"],
             essay_count=file_doc.get("essay_count", 0),
-            category_id=file_doc["category_id"],
             choice_count=file_doc.get("choice_count", 0)
         ))
     return files
