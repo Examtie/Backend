@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Body
+from fastapi import APIRouter, Depends, Query, Body, HTTPException
 from app.models import MeReturn,UpdateProfile, ExamFileOut, BookmarkCreate, BookmarkOut, ExamQuestion, ExamSubmissionCreate, ExamSubmissionOut, ExamAnswerCreate
 from app.database import users_collection, exam_files_collection, bookmarks_collection, exam_questions_collection, exam_submissions_collection
 from app.dependencies import get_current_user, require_roles, get_user_by_email
@@ -26,10 +26,12 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
 
 @router.put("/@me", response_model=MeReturn)
 async def update_profile(update: UpdateProfile, current_user: dict = Depends(get_current_user)):
-    update_data = {k: v for k, v in update.dict().items() if v is not None}
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     if update_data:
         await users_collection.update_one({"_id": current_user["_id"]}, {"$set": update_data})
     updated_user = await get_user_by_email(current_user["email"])
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
     return MeReturn(
         id=str(updated_user["_id"]),
         email=updated_user["email"],
@@ -42,7 +44,7 @@ async def update_profile(update: UpdateProfile, current_user: dict = Depends(get
 
 
 @router.get("/dashboard")
-async def dashboard(user: dict = Depends(require_roles(ALL_ROLES))):
+async def dashboard(user: dict = Depends(require_roles("user"))):
     return {
         "message": f"Welcome {user.get('email')}!",
         "roles": user.get("roles", [])
@@ -86,9 +88,8 @@ async def user_list_exams_by_category(
             tags=file_doc.get("tags", []),
             url=file_doc["url"],
             uploaded_by=file_doc["uploaded_by"],
-            category_id=file_doc["category_id"],
-            essay_count=file_doc["essay_count"],
-            choice_count=file_doc["choice_count"]
+            essay_count=file_doc.get("essay_count", 0),
+            choice_count=file_doc.get("choice_count", 0)
         ))
     return files
 

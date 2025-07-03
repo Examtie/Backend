@@ -177,7 +177,7 @@ async def delete_user(user_id: str, admin: dict = Depends(require_roles(ADMIN_RO
 
 @router.patch("/users/{user_id}")
 async def edit_any_user_profile(user_id: str, update: UpdateProfile, admin: dict = Depends(require_roles(ADMIN_ROLE))):
-    update_data = {k: v for k, v in update.dict().items() if v is not None}
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided")
 
@@ -190,6 +190,8 @@ async def edit_any_user_profile(user_id: str, update: UpdateProfile, admin: dict
             raise HTTPException(status_code=404, detail="User not found")
 
         updated_user = await users_collection.find_one({"_id": ObjectId(user_id)})
+        if not updated_user:
+            raise HTTPException(status_code=404, detail="User not found after update")
         return AdminUserOut(
             id=str(updated_user["_id"]),
             email=updated_user["email"],
@@ -240,7 +242,7 @@ async def update_exam_category(
     update: ExamCategoryUpdate,
     admin: dict = Depends(require_roles(ADMIN_ROLE))
 ):
-    update_dict = {k: v for k, v in update.dict().items() if v is not None}
+    update_dict = {k: v for k, v in update.model_dump().items() if v is not None}
     if not update_dict:
         raise HTTPException(status_code=400, detail="No data provided")
     result = await exam_categories_collection.update_one(
@@ -250,6 +252,8 @@ async def update_exam_category(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Category not found")
     updated = await exam_categories_collection.find_one({"_id": ObjectId(category_id)})
+    if not updated:
+        raise HTTPException(status_code=404, detail="Category not found after update")
     return ExamCategoryOut(
         id=str(updated["_id"]),
         name=updated["name"],
@@ -349,7 +353,7 @@ async def update_exam_file(
     update_data: ExamFileUpdate,
     admin=Depends(require_roles(ADMIN_ROLE))
 ):
-    update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
     if not update_dict:
         raise HTTPException(status_code=400, detail="No data provided")
     update_dict["updated_at"] = datetime.utcnow()
@@ -361,6 +365,8 @@ async def update_exam_file(
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="File not found")
         updated = await exam_files_collection.find_one({"_id": ObjectId(file_id)})
+        if not updated:
+            raise HTTPException(status_code=404, detail="File not found after update")
         return ExamFileOut(
             id=str(updated["_id"]),
             title=updated["title"],
