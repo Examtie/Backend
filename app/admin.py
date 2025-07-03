@@ -244,7 +244,8 @@ async def update_exam_category(
     return ExamCategoryOut(
         id=str(updated["_id"]),
         name=updated["name"],
-        description=updated.get("description", "")
+        description=updated.get("description", ""),
+        english_name=updated.get("english_name", "")
     )
 
 @router.delete("/exam-categories/{category_id}")

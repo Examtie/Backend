@@ -58,15 +58,18 @@ class UpdateProfile(BaseModel):
 class ExamCategoryCreate(BaseModel):
     name: str = Field(..., example="วิทยาศาสตร์")
     description: Optional[str] = Field(None, example="หมวดวิชาวิทยาศาสตร์")
+    english_name: Optional[str] = Field(None, json_schema_extra={"example": "Science"})
 
 class ExamCategoryUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    english_name: Optional[str] = None
 
 class ExamCategoryOut(BaseModel):
     id: str
     name: str
     description: Optional[str] = None
+    english_name: Optional[str] = None
 
 class ExamFileCreate(BaseModel):
     title: str = Field(..., json_schema_extra={"example": "Midterm Physics"})

@@ -163,7 +163,8 @@ async def user_list_exam_categories():
         categories.append(ExamCategoryOut(
             id=str(cat["_id"]),
             name=cat["name"],
-            description=cat.get("description", "")
+            description=cat.get("description", ""),
+            english_name=cat.get("english_name", "")
         ))
     return categories
 
@@ -179,5 +180,6 @@ async def user_get_exam_category(category_id: str):
     return ExamCategoryOut(
         id=str(cat["_id"]),
         name=cat["name"],
-        description=cat.get("description", "")
+        description=cat.get("description", ""),
+        english_name=cat.get("english_name", "")
     )
