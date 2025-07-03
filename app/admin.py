@@ -268,6 +268,40 @@ async def delete_exam_category(
 
 # === EXAM MANAGEMENT ===
 
+@router.get("/test-r2")
+async def test_r2_configuration(
+    admin=Depends(require_roles(ADMIN_ROLE))
+):
+    """Test endpoint to check R2 configuration"""
+    from app.storage.r2_client import R2_CONFIGURED, r2, BUCKET
+    import os
+    
+    config_status = {
+        "r2_configured": R2_CONFIGURED,
+        "r2_client_initialized": r2 is not None,
+        "bucket_name": BUCKET,
+        "has_endpoint_url": bool(os.getenv("R2_ENDPOINT_URL")),
+        "has_access_key": bool(os.getenv("R2_ACCESS_KEY")),
+        "has_secret_key": bool(os.getenv("R2_SECRET_KEY")),
+        "has_bucket_name": bool(os.getenv("R2_BUCKET_NAME")),
+    }
+    
+    # Test bucket access if configured
+    if R2_CONFIGURED and r2 and BUCKET:
+        try:
+            # Try to list objects (this will test connectivity and permissions)
+            response = r2.list_objects_v2(Bucket=BUCKET, MaxKeys=1)
+            config_status["bucket_accessible"] = True
+            config_status["bucket_test_error"] = None
+        except Exception as e:
+            config_status["bucket_accessible"] = False
+            config_status["bucket_test_error"] = str(e)
+    else:
+        config_status["bucket_accessible"] = False
+        config_status["bucket_test_error"] = "R2 not properly configured"
+    
+    return config_status
+
 @router.post("/upload", response_model=ExamFileOut)
 async def upload_exam_file(
     file: UploadFile = File(...),
