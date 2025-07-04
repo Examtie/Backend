@@ -1,5 +1,6 @@
 import boto3
 import os
+import re
 from dotenv import load_dotenv
 import uuid
 from fastapi import UploadFile, HTTPException
@@ -23,7 +24,6 @@ if R2_CONFIGURED:
     account_id = os.getenv("R2_ACCOUNT_ID")
     if not account_id and s3_endpoint and "r2.cloudflarestorage.com" in s3_endpoint:
         # Extract account ID from URL like https://account_id.r2.cloudflarestorage.com
-        import re
         match = re.search(r'https://([a-f0-9]{32})\.r2\.cloudflarestorage\.com', s3_endpoint)
         if match:
             account_id = match.group(1)
@@ -50,7 +50,11 @@ if R2_CONFIGURED:
         # Otherwise construct it from the account ID
         public_domain = os.getenv("R2_PUBLIC_DOMAIN")
         if public_domain:
-            PUBLIC_ENDPOINT = f"https://{public_domain}"
+            # Don't add https:// if it's already included
+            if public_domain.startswith("http"):
+                PUBLIC_ENDPOINT = public_domain
+            else:
+                PUBLIC_ENDPOINT = f"https://{public_domain}"
         elif account_id:
             # Use the standard public R2 URL format
             # The correct format should be: https://pub-{first-16-chars-of-account-id}.r2.dev
@@ -109,12 +113,18 @@ async def upload_to_r2(file: UploadFile) -> str:
         if PUBLIC_ENDPOINT:
             return f"{PUBLIC_ENDPOINT}/{file_id}"
         else:
-            # Fallback: try to construct URL from account ID
-            if account_id:
-                return f"https://pub-{account_id[:16]}.r2.dev/{file_id}"
+            # Fallback: try to construct URL from environment variables
+            public_domain = os.getenv("R2_PUBLIC_DOMAIN")
+            if public_domain:
+                return f"https://{public_domain}/{file_id}"
             else:
-                # This might not work but provides a URL
-                return f"https://{BUCKET}.r2.cloudflarestorage.com/{file_id}"
+                # Last resort: construct from account ID from environment
+                account_id = os.getenv("R2_ACCOUNT_ID")
+                if account_id:
+                    return f"https://pub-{account_id[:16]}.r2.dev/{file_id}"
+                else:
+                    # This might not work but provides a URL
+                    return f"https://{BUCKET}.r2.cloudflarestorage.com/{file_id}"
             
     except Exception as e:
         error_msg = str(e)
