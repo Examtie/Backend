@@ -10,7 +10,8 @@ load_dotenv()
 R2_CONFIGURED = bool(
     os.getenv("R2_ACCESS_KEY") and 
     os.getenv("R2_SECRET_KEY") and 
-    os.getenv("R2_BUCKET_NAME")
+    os.getenv("R2_BUCKET_NAME") and
+    os.getenv("R2_ENDPOINT_URL")
 )
 
 if R2_CONFIGURED:
