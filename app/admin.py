@@ -365,10 +365,17 @@ async def update_exam_file(
             essay_count=updated.get("essay_count", 0),
             choice_count=updated.get("choice_count", 0)
         )
+    except ValueError as ve:
+        # Validation errors from the model
+        raise HTTPException(status_code=422, detail=str(ve))
     except Exception as e:
         if "invalid" in str(e).lower():
             raise HTTPException(status_code=400, detail="Invalid file ID format")
-        raise HTTPException(status_code=500, detail="Failed to update exam file")
+        # Log the actual error for debugging
+        print(f"Update error: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to update exam file: {str(e)}")
 
 @router.get("/exam-files", response_model=List[ExamFileOut])
 async def list_exam_files(

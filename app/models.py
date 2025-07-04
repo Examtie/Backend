@@ -94,13 +94,13 @@ class ExamFileUpdate(BaseModel):
     choice_count: Optional[int] = Field(None, ge=0, description="จำนวนข้อกา")
 
     @model_validator(mode="after")
-    def at_least_one_question_type_update(cls, values):
-        essay = values.get('essay_count')
-        choice = values.get('choice_count')
+    def at_least_one_question_type_update(self):
+        essay = self.essay_count
+        choice = self.choice_count
         if essay is not None or choice is not None:
             if (essay or 0) < 1 and (choice or 0) < 1:
                 raise ValueError('ต้องมีอย่างน้อย 1 ใน 2 (essay_count หรือ choice_count) ที่เป็น 1 ขึ้นไป')
-        return values
+        return self
 
 class ExamFileOut(BaseModel):
     id: str
