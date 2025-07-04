@@ -116,7 +116,10 @@ async def upload_to_r2(file: UploadFile) -> str:
             # Fallback: try to construct URL from environment variables
             public_domain = os.getenv("R2_PUBLIC_DOMAIN")
             if public_domain:
-                return f"https://{public_domain}/{file_id}"
+                if public_domain.startswith("http"):
+                    return f"{public_domain}/{file_id}"
+                else:
+                    return f"https://{public_domain}/{file_id}"
             else:
                 # Last resort: construct from account ID from environment
                 account_id = os.getenv("R2_ACCOUNT_ID")
