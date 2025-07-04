@@ -53,6 +53,7 @@ if R2_CONFIGURED:
             PUBLIC_ENDPOINT = f"https://{public_domain}"
         elif account_id:
             # Use the standard public R2 URL format
+            # The correct format should be: https://pub-{first-16-chars-of-account-id}.r2.dev
             PUBLIC_ENDPOINT = f"https://pub-{account_id[:16]}.r2.dev"
         else:
             PUBLIC_ENDPOINT = None
@@ -101,19 +102,18 @@ async def upload_to_r2(file: UploadFile) -> str:
             file.file,
             BUCKET,
             file_id,
-            ExtraArgs={"ACL": "public-read"}  # Optional: make file public
+            ExtraArgs={"ACL": "public-read"}  # Make file public
         )
         
         # Construct the public URL for the uploaded file
         if PUBLIC_ENDPOINT:
             return f"{PUBLIC_ENDPOINT}/{file_id}"
         else:
-            # Use a direct approach with the bucket name
-            # For R2, you can access files via: https://<bucket-name>.<account-id>.r2.cloudflarestorage.com/<file-id>
+            # Fallback: try to construct URL from account ID
             if account_id:
-                return f"https://{BUCKET}.{account_id}.r2.cloudflarestorage.com/{file_id}"
+                return f"https://pub-{account_id[:16]}.r2.dev/{file_id}"
             else:
-                # Fallback - this might not work but provides a URL
+                # This might not work but provides a URL
                 return f"https://{BUCKET}.r2.cloudflarestorage.com/{file_id}"
             
     except Exception as e:
