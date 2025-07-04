@@ -4,7 +4,8 @@ from dotenv import load_dotenv
 import uuid
 from fastapi import UploadFile, HTTPException
 
-load_dotenv()
+# Load environment variables from the Backend directory
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
 # Check if R2 is configured
 R2_CONFIGURED = bool(

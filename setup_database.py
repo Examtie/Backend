@@ -8,7 +8,8 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load environment variables from the Backend directory
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
 # Database configuration
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")

@@ -9,7 +9,8 @@ import os
 import sys
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load environment variables from the Backend directory
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 def main():
     print("🔍 Cloudflare R2 Account ID Helper")
