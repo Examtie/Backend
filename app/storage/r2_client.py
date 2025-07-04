@@ -50,15 +50,12 @@ if R2_CONFIGURED:
         # Otherwise construct it from the account ID
         public_domain = os.getenv("R2_PUBLIC_DOMAIN")
         if public_domain:
-            # Don't add https:// if it's already included
-            if public_domain.startswith("http"):
-                PUBLIC_ENDPOINT = public_domain
-            else:
-                PUBLIC_ENDPOINT = f"https://{public_domain}"
+            # Use the domain as-is without adding https:// prefix
+            PUBLIC_ENDPOINT = public_domain
         elif account_id:
             # Use the standard public R2 URL format
-            # The correct format should be: https://pub-{first-16-chars-of-account-id}.r2.dev
-            PUBLIC_ENDPOINT = f"https://pub-{account_id[:16]}.r2.dev"
+            # The correct format should be: pub-{first-16-chars-of-account-id}.r2.dev
+            PUBLIC_ENDPOINT = f"pub-{account_id[:16]}.r2.dev"
         else:
             PUBLIC_ENDPOINT = None
         
@@ -116,12 +113,12 @@ async def upload_to_r2(file: UploadFile) -> str:
             # Fallback: try to construct URL from environment variables
             public_domain = os.getenv("R2_PUBLIC_DOMAIN")
             if public_domain:
-                return f"https://{public_domain}/{file_id}"
+                return f"{public_domain}/{file_id}"
             else:
                 # Last resort: construct from account ID from environment
                 account_id = os.getenv("R2_ACCOUNT_ID")
                 if account_id:
-                    return f"https://pub-{account_id[:16]}.r2.dev/{file_id}"
+                    return f"pub-{account_id[:16]}.r2.dev/{file_id}"
                 else:
                     # This might not work but provides a URL
                     return f"https://{BUCKET}.r2.cloudflarestorage.com/{file_id}"
