@@ -155,6 +155,40 @@ async def submit_exam(
     result = await exam_submissions_collection.insert_one(doc)
     return {"submission_id": str(result.inserted_id), "exam_id": exam_id}
 
+@router.post("/exams/{exam_id}/save-progress")
+async def save_exam_progress(
+    exam_id: str,
+    submission: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Save exam progress (auto-save functionality)"""
+    # Check if there's an existing progress save
+    existing = await exam_submissions_collection.find_one({
+        "user_id": str(current_user["_id"]),
+        "exam_id": exam_id,
+        "is_draft": True
+    })
+    
+    doc = {
+        "user_id": str(current_user["_id"]),
+        "exam_id": exam_id,
+        "answers": submission.get("answers", []),
+        "is_draft": submission.get("is_draft", True),
+        "saved_at": datetime.utcnow()
+    }
+    
+    if existing:
+        # Update existing draft
+        await exam_submissions_collection.update_one(
+            {"_id": existing["_id"]},
+            {"$set": doc}
+        )
+        return {"message": "Progress saved", "submission_id": str(existing["_id"])}
+    else:
+        # Create new draft
+        result = await exam_submissions_collection.insert_one(doc)
+        return {"message": "Progress saved", "submission_id": str(result.inserted_id)}
+
 # === EXAM CATEGORY MANAGEMENT FOR USERS ===
 @router.get("/exam-categories", response_model=List[ExamCategoryOut])
 async def user_list_exam_categories():
@@ -183,3 +217,50 @@ async def user_get_exam_category(category_id: str):
         description=cat.get("description", ""),
         english_name=cat.get("english_name", "")
     )
+
+@router.get("/exams-with-progress", response_model=List[dict])
+async def user_list_exams_with_progress(
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get exams with user's progress information"""
+    skip = (page - 1) * limit
+    files = []
+    
+    async for file_doc in exam_files_collection.find().skip(skip).limit(limit):
+        exam_file = {
+            "id": str(file_doc["_id"]),
+            "title": file_doc["title"],
+            "description": file_doc["description"],
+            "tags": file_doc.get("tags", []),
+            "url": file_doc["url"],
+            "uploaded_by": file_doc["uploaded_by"],
+            "essay_count": file_doc.get("essay_count", 0),
+            "choice_count": file_doc.get("choice_count", 0),
+            "progress": None,
+            "is_completed": False
+        }
+        
+        # Check for submissions (completed or draft)
+        submission = await exam_submissions_collection.find_one({
+            "user_id": str(current_user["_id"]),
+            "exam_id": str(file_doc["_id"])
+        }, sort=[("submitted_at", -1), ("saved_at", -1)])
+        
+        if submission:
+            total_questions = file_doc.get("essay_count", 0) + file_doc.get("choice_count", 0)
+            answered_count = len([a for a in submission.get("answers", []) if a.get("answer") and str(a.get("answer")).strip()])
+            
+            exam_file["progress"] = {
+                "answered_count": answered_count,
+                "total_questions": total_questions,
+                "percentage": (answered_count / total_questions * 100) if total_questions > 0 else 0,
+                "last_updated": submission.get("saved_at") or submission.get("submitted_at"),
+                "is_draft": submission.get("is_draft", False)
+            }
+            exam_file["is_completed"] = not submission.get("is_draft", False) and submission.get("submitted_at") is not None
+        
+        files.append(exam_file)
+    
+    return files
