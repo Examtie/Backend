@@ -145,15 +145,33 @@ async def submit_exam(
     submission: dict = Body(...),
     current_user: dict = Depends(get_current_user)
 ):
-    # Save submission
+    # Check if there's an existing draft to update
+    existing_draft = await exam_submissions_collection.find_one({
+        "user_id": str(current_user["_id"]),
+        "exam_id": exam_id,
+        "is_draft": True
+    })
+    
     doc = {
         "user_id": str(current_user["_id"]),
         "exam_id": exam_id,
         "answers": submission.get("answers", []),
-        "submitted_at": datetime.utcnow()
+        "submitted_at": datetime.utcnow(),
+        "time_spent": submission.get("time_spent", 0),
+        "is_draft": False
     }
-    result = await exam_submissions_collection.insert_one(doc)
-    return {"submission_id": str(result.inserted_id), "exam_id": exam_id}
+    
+    if existing_draft:
+        # Update existing draft to completed submission
+        await exam_submissions_collection.update_one(
+            {"_id": existing_draft["_id"]},
+            {"$set": doc}
+        )
+        return {"submission_id": str(existing_draft["_id"]), "exam_id": exam_id}
+    else:
+        # Create new submission
+        result = await exam_submissions_collection.insert_one(doc)
+        return {"submission_id": str(result.inserted_id), "exam_id": exam_id}
 
 @router.post("/exams/{exam_id}/save-progress")
 async def save_exam_progress(
@@ -174,7 +192,8 @@ async def save_exam_progress(
         "exam_id": exam_id,
         "answers": submission.get("answers", []),
         "is_draft": submission.get("is_draft", True),
-        "saved_at": datetime.utcnow()
+        "saved_at": datetime.utcnow(),
+        "time_spent": submission.get("time_spent", 0)
     }
     
     if existing:
@@ -264,3 +283,125 @@ async def user_list_exams_with_progress(
         files.append(exam_file)
     
     return files
+
+# === EXAM PROGRESS MANAGEMENT ===
+@router.get("/exam-progress")
+async def get_exam_progress(current_user: dict = Depends(get_current_user)):
+    """Get user's exam progress for all exams"""
+    progress_data = []
+    
+    async for submission in exam_submissions_collection.find({"user_id": str(current_user["_id"])}):
+        exam_id = submission["exam_id"]
+        
+        # Get exam file to calculate total questions
+        exam_file = await exam_files_collection.find_one({"_id": ObjectId(exam_id)})
+        if not exam_file:
+            continue
+            
+        total_questions = exam_file.get("essay_count", 0) + exam_file.get("choice_count", 0)
+        answered_count = len([a for a in submission.get("answers", []) if a.get("answer") and str(a.get("answer")).strip()])
+        
+        progress_data.append({
+            "exam_id": exam_id,
+            "progress_percentage": (answered_count / total_questions * 100) if total_questions > 0 else 0,
+            "answered_count": answered_count,
+            "total_questions": total_questions,
+            "last_attempted": submission.get("saved_at") or submission.get("submitted_at"),
+            "is_completed": not submission.get("is_draft", False) and submission.get("submitted_at") is not None,
+            "time_spent": submission.get("time_spent", 0)
+        })
+    
+    return progress_data
+
+@router.get("/exams/in-progress", response_model=List[dict])
+async def get_in_progress_exams(current_user: dict = Depends(get_current_user)):
+    """Get all exams that are currently in progress (drafts with answers)"""
+    in_progress_exams = []
+    
+    # Find all draft submissions with answers
+    async for submission in exam_submissions_collection.find({
+        "user_id": str(current_user["_id"]),
+        "is_draft": True,
+        "answers": {"$exists": True, "$ne": []}
+    }).sort("saved_at", -1):
+        
+        exam_id = submission["exam_id"]
+        
+        # Get exam file details
+        try:
+            exam_file = await exam_files_collection.find_one({"_id": ObjectId(exam_id)})
+            if not exam_file:
+                continue
+                
+            total_questions = exam_file.get("essay_count", 0) + exam_file.get("choice_count", 0)
+            answered_count = len([a for a in submission.get("answers", []) if a.get("answer") and str(a.get("answer")).strip()])
+            
+            # Only include if there are actual answers
+            if answered_count > 0:
+                in_progress_exams.append({
+                    "exam_id": exam_id,
+                    "title": exam_file["title"],
+                    "description": exam_file["description"],
+                    "tags": exam_file.get("tags", []),
+                    "url": exam_file["url"],
+                    "essay_count": exam_file.get("essay_count", 0),
+                    "choice_count": exam_file.get("choice_count", 0),
+                    "progress_percentage": (answered_count / total_questions * 100) if total_questions > 0 else 0,
+                    "answered_count": answered_count,
+                    "total_questions": total_questions,
+                    "last_saved": submission.get("saved_at"),
+                    "time_spent": submission.get("time_spent", 0),
+                    "submission_id": str(submission["_id"])
+                })
+        except Exception as e:
+            print(f"Error processing exam {exam_id}: {e}")
+            continue
+    
+    return in_progress_exams
+
+@router.delete("/exams/{exam_id}/progress")
+async def clear_exam_progress(
+    exam_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Clear saved progress for an exam (delete draft)"""
+    try:
+        result = await exam_submissions_collection.delete_one({
+            "user_id": str(current_user["_id"]),
+            "exam_id": exam_id,
+            "is_draft": True
+        })
+        
+        if result.deleted_count > 0:
+            return {"message": "Progress cleared successfully"}
+        else:
+            return {"message": "No progress found to clear"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear progress: {str(e)}")
+
+@router.post("/exams/{exam_id}/update-activity")
+async def update_exam_activity(
+    exam_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update user's last activity timestamp for an exam"""
+    try:
+        # Update or create activity record
+        await exam_submissions_collection.update_one(
+            {
+                "user_id": str(current_user["_id"]),
+                "exam_id": exam_id,
+                "is_draft": True
+            },
+            {
+                "$set": {
+                    "last_activity": datetime.utcnow()
+                }
+            },
+            upsert=False  # Only update if exists
+        )
+        
+        return {"message": "Activity updated"}
+    except Exception as e:
+        # Don't fail the request if activity update fails
+        return {"message": "Activity update skipped"}
