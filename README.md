@@ -26,6 +26,11 @@ docker build -t examtie-backend .
 docker run -p 8000:8000 examtie-backend
 ```
 
+## Setup Redis
+```
+redis-server
+```
+
 ## Testing
 ```bash
 pytest

@@ -4,6 +4,10 @@ from app.models import *
 from app.database import users_collection, exam_files_collection, bookmarks_collection, exam_questions_collection, exam_submissions_collection, exam_categories_collection
 from app.dependencies import get_current_user, require_roles, get_user_by_email
 from typing import List, Any
+from pydantic import BaseModel
+from datetime import date, timedelta
+import redis.asyncio as redis_async
+from app.database import redis_client
 from datetime import datetime
 
 from app.settings import ALL_ROLES
@@ -167,10 +171,12 @@ async def submit_exam(
             {"_id": existing_draft["_id"]},
             {"$set": doc}
         )
+        await update_user_streak(str(current_user["_id"]))
         return {"submission_id": str(existing_draft["_id"]), "exam_id": exam_id}
     else:
         # Create new submission
         result = await exam_submissions_collection.insert_one(doc)
+        await update_user_streak(str(current_user["_id"]))
         return {"submission_id": str(result.inserted_id), "exam_id": exam_id}
 
 @router.post("/exams/{exam_id}/save-progress")
@@ -379,6 +385,47 @@ async def clear_exam_progress(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to clear progress: {str(e)}")
 
+async def update_user_streak(user_id: str):
+    today = date.today()
+    today_str = today.isoformat()
+    key = f"streak:{user_id}"
+    data = await redis_client.hgetall(key)
+    if not data:
+        await redis_client.hset(key, mapping={"current": 1, "last_date": today_str, "revives_used": 0})
+        return
+
+    last_date_str = data.get("last_date")
+    current = int(data.get("current", 0))
+    revives = int(data.get("revives_used", 0))
+
+    if last_date_str == today_str:
+        return  # already counted
+
+    last_date = date.fromisoformat(last_date_str)
+    if last_date == today - timedelta(days=1):
+        current += 1  # consecutive day
+    else:
+        # missed day(s)
+        if revives < 3:
+            current += 1  # revive keeps streak
+            revives += 1
+        else:
+            current = 1  # reset streak
+    await redis_client.hset(key, mapping={"current": current, "last_date": today_str, "revives_used": revives})
+
+class StreakInfo(BaseModel):
+    current: int
+    revives_used: int
+
+@router.get("/streak", response_model=StreakInfo)
+async def get_streak(current_user: dict = Depends(get_current_user)):
+    key = f"streak:{current_user['_id']}"
+    data = await redis_client.hgetall(key)
+    if not data:
+        return {"current": 0, "revives_used": 0}
+    return {"current": int(data.get("current", 0)), "revives_used": int(data.get("revives_used", 0))}
+
+
 @router.post("/exams/{exam_id}/check-answer", response_model=AnswerCheckResult)
 async def check_answer(
     exam_id: str,
@@ -424,6 +471,7 @@ async def check_answer(
                 if user_answer.lower() == str(pat).lower():
                     correct = True
                     break
+    # update streak only when answer is correct and first time today maybe; we will call update_user_streak in submit_exam instead
     return {"correct": correct}
 
 @router.post("/exams/{exam_id}/update-activity")

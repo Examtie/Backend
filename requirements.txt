@@ -13,3 +13,4 @@ pytest
 httpx
 pytest-asyncio
 pymongo
+redis
