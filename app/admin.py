@@ -302,6 +302,7 @@ async def upload_exam_file(
     tags: str = Form(...),  # This will be the list of category IDs
     essay_count: int = Form(...),
     choice_count: int = Form(...),
+    answer_key: str = Form(None),  # JSON string mapping question -> answer
     admin=Depends(require_roles(ADMIN_ROLE)),
     current_user=Depends(get_current_user)
 ):
@@ -319,6 +320,14 @@ async def upload_exam_file(
         raise HTTPException(status_code=400, detail="ต้องมีอย่างน้อย 1 ใน 2 (essay_count หรือ choice_count) ที่เป็น 1 ขึ้นไป")
 
     file_url = await upload_to_r2(file)
+    # Parse answer_key JSON if provided
+    answer_key_data = None
+    if answer_key:
+        try:
+            answer_key_data = json.loads(answer_key)
+        except Exception:
+            raise HTTPException(status_code=400, detail="answer_key must be valid JSON")
+
     record = {
         "title": title,
         "description": description,
@@ -328,7 +337,8 @@ async def upload_exam_file(
         "url": file_url,
         "uploaded_by": current_user["email"],
         "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "updated_at": datetime.utcnow(),
+        "answer_key": answer_key_data
     }
     result = await exam_files_collection.insert_one(record)
     record["id"] = str(result.inserted_id)

@@ -31,6 +31,12 @@ docker run -p 8000:8000 examtie-backend
 pytest
 ```
 
+## venv
+```
+python3 -m venv venv
+source venv/bin/activate
+```
+
 ## Features
 
 - 🔐 **Authentication & Authorization**: JWT-based auth with role-based access control

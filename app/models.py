@@ -167,3 +167,25 @@ class ExamSubmissionOut(BaseModel):
     exam_id: str
     answers: List[ExamAnswerOut]
     submitted_at: datetime
+
+# ------------------- MARKET MODELS -------------------
+
+# Answer checking
+class AnswerCheckRequest(BaseModel):
+    question_id: str
+    answer: str
+
+class AnswerCheckResult(BaseModel):
+    correct: bool
+class MarketItemOut(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    price: float
+    image_url: Optional[str] = None
+
+class MarketItemCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: float
+    image_url: Optional[str] = None

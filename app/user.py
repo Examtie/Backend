@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, Body, HTTPException
 from bson import ObjectId
-from app.models import MeReturn, UpdateProfile, ExamFileOut, BookmarkCreate, BookmarkOut, ExamQuestion, ExamSubmissionCreate, ExamSubmissionOut, ExamAnswerCreate, ExamCategoryOut
+from app.models import *
 from app.database import users_collection, exam_files_collection, bookmarks_collection, exam_questions_collection, exam_submissions_collection, exam_categories_collection
 from app.dependencies import get_current_user, require_roles, get_user_by_email
 from typing import List, Any
@@ -378,6 +378,53 @@ async def clear_exam_progress(
             return {"message": "No progress found to clear"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to clear progress: {str(e)}")
+
+@router.post("/exams/{exam_id}/check-answer", response_model=AnswerCheckResult)
+async def check_answer(
+    exam_id: str,
+    payload: AnswerCheckRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Check a user's answer against the stored answer key.
+    For multiple_choice questions we compare directly.
+    For fill/essay we treat the stored answer as case-insensitive regex (or list of regex patterns) and evaluate with `re`.
+    """
+    # Fetch question
+    try:
+        qdoc = await exam_questions_collection.find_one({"_id": ObjectId(payload.question_id), "exam_id": exam_id})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid question ID")
+
+    if not qdoc:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    correct = False
+    q_answer = qdoc.get("answer")
+    q_type = qdoc.get("type")
+    user_answer = payload.answer.strip() if isinstance(payload.answer, str) else payload.answer
+
+    import re, json
+
+    if q_type == "multiple_choice":
+        # stored answer could be str or list
+        if isinstance(q_answer, list):
+            correct = user_answer in q_answer
+        else:
+            correct = user_answer == q_answer
+    else:
+        # Treat stored answer(s) as regex pattern(s)
+        patterns = q_answer if isinstance(q_answer, list) else [q_answer]
+        for pat in patterns:
+            try:
+                if re.fullmatch(pat, user_answer, flags=re.IGNORECASE):
+                    correct = True
+                    break
+            except re.error:
+                # fallback to simple equality
+                if user_answer.lower() == str(pat).lower():
+                    correct = True
+                    break
+    return {"correct": correct}
 
 @router.post("/exams/{exam_id}/update-activity")
 async def update_exam_activity(

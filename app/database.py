@@ -11,3 +11,5 @@ exam_categories_collection = db.get_collection("exam_categories")
 bookmarks_collection = db.get_collection("bookmarks")
 exam_questions_collection = db.get_collection("exam_questions")
 exam_submissions_collection = db.get_collection("exam_submissions")
+# Collection for market items
+market_items_collection = db.get_collection("market_items")
