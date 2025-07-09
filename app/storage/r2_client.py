@@ -110,24 +110,25 @@ async def upload_to_r2(file: UploadFile) -> str:
         )
         
         # Construct the public URL for the uploaded file
-        if PUBLIC_ENDPOINT:
-            return f"{PUBLIC_ENDPOINT}/{file_id}"
-        else:
+        #if PUBLIC_ENDPOINT:
+            #return f"{PUBLIC_ENDPOINT}/{file_id}"
+        #else:
             # Fallback: try to construct URL from environment variables
-            public_domain = os.getenv("R2_PUBLIC_DOMAIN")
-            if public_domain:
-                if public_domain.startswith("http"):
-                    return f"{public_domain}/{file_id}"
-                else:
-                    return f"https://{public_domain}/{file_id}"
-            else:
+            #public_domain = os.getenv("R2_PUBLIC_DOMAIN")
+            #if public_domain:
+                #if public_domain.startswith("http"):
+                    #return f"{public_domain}/{file_id}"
+                #else:
+                    #return f"https://{public_domain}/{file_id}"
+            #else:
+        return f"https://pub-ec581fd3be54492190988525aca67c77.r2.dev/{file_id}"
                 # Last resort: construct from account ID from environment
-                account_id = os.getenv("R2_ACCOUNT_ID")
-                if account_id:
-                    return f"https://pub-{account_id[:16]}.r2.dev/{file_id}"
-                else:
+                #account_id = os.getenv("R2_ACCOUNT_ID")
+                #if account_id:
+                #return f"https://pub-{account_id[:16]}.r2.dev/{file_id}"
+                #else:
                     # This might not work but provides a URL
-                    return f"https://{BUCKET}.r2.cloudflarestorage.com/{file_id}"
+                    #return f"https://{BUCKET}.r2.cloudflarestorage.com/{file_id}"
             
     except Exception as e:
         error_msg = str(e)
