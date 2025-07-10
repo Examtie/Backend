@@ -32,6 +32,29 @@ from app.authention import router as auth_router
 from app.user import router as user_router
 from app.market import router as market_router
 
+import logging
+from app.database import client as mongo_client, redis_client
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("startup")
+
+@app.on_event("startup")
+async def check_backend_dependencies():
+    """Verify MongoDB and Redis connections on startup and log the results."""
+    # MongoDB
+    try:
+        await mongo_client.admin.command("ping")
+        logger.info("✅ MongoDB connection successful")
+    except Exception as exc:
+        logger.exception("❌ MongoDB connection failed: %s", exc)
+
+    # Redis
+    try:
+        await redis_client.ping()
+        logger.info("✅ Redis connection successful")
+    except Exception as exc:
+        logger.exception("❌ Redis connection failed: %s", exc)
+
 app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(user_router)
