@@ -9,7 +9,7 @@ DATABASE_NAME = os.getenv("DATABASE_NAME", "myapp")
 
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
 REDIS_DB = os.getenv("REDIS_DB", "0")
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+REDIS_URL = os.getenv("REDIS_URL_KRUB", "redis://localhost:6379")
 CACHE_EXPIRE_SECONDS = int(os.getenv("CACHE_EXPIRE_SECONDS", 3600))
 
 SECRET_KEY = os.getenv("SECRET_KEY", "niga56")
