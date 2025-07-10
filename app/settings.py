@@ -16,16 +16,13 @@ SECRET_KEY = os.getenv("SECRET_KEY", "niga56")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES_SECONDS", 43200)) # 30 days (30 * 24 * 60 minutes)
 
+STREAK_TTL_SECONDS = int(os.getenv("STREAK_TTL_SECONDS", 60 * 60 * 24 * 60))  # 60 days default
+
 ADMIN_ROLE = "admin"
 USER_ROLE = "user"
 STAFF_ROLE = "staff"
 SELLER_ROLE = "seller"
 
-if REDIS_PASSWORD:
-    REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_URL}/{REDIS_DB}"
-else:
-    REDIS_URL = f"redis://{REDIS_URL}/{REDIS_DB}"
+REDIS_URL = f"{REDIS_URL}/{REDIS_DB}"
     
-STREAK_TTL_SECONDS = int(os.getenv("STREAK_TTL_SECONDS", 60 * 60 * 24 * 60))  # 60 days default
-
 ALL_ROLES = [ADMIN_ROLE, USER_ROLE, STAFF_ROLE, SELLER_ROLE]
