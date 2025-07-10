@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.settings import ALL_ROLES
+from app.settings import ALL_ROLES, REDIS_URL
 from app.models import UserOut, UpdateProfile, Token
 from app.database import users_collection
 from app.dependencies import get_current_user, require_roles, get_user_by_email
@@ -53,7 +53,7 @@ async def check_backend_dependencies():
         await redis_client.ping()
         logger.info("✅ Redis connection successful")
     except Exception as exc:
-        logger.exception("❌ Redis connection failed: %s", exc)
+        logger.exception(f"❌ Redis connection failed {REDIS_URL}: %s", exc)
 
 app.include_router(admin_router)
 app.include_router(auth_router)
