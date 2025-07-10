@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from app.database import redis_client
+from bson import json_util
 from datetime import datetime
 
 
@@ -7,6 +9,7 @@ from app.models import UserIn, UserOut, Token
 from app.database import users_collection
 from app.auth import hash_password, verify_password, create_access_token
 from app.dependencies import get_user_by_email, get_user_by_username
+from app.settings import CACHE_EXPIRE_SECONDS
 
 router = APIRouter(
     prefix="/auth/api/v1",
@@ -30,6 +33,13 @@ async def register(user_in: UserIn):
     })
 
     result = await users_collection.insert_one(user_data)
+    # Cache the newly created user in Redis for quicker future logins
+    user_data["_id"] = result.inserted_id
+
+    await redis_client.set(f"user:{user_data['email']}", json_util.dumps(user_data), ex=CACHE_EXPIRE_SECONDS)
+    if user_data.get("username"):
+        await redis_client.set(f"user_by_username:{user_data['username']}", json_util.dumps(user_data), ex=CACHE_EXPIRE_SECONDS)
+
     access_token = create_access_token(
         data={"sub": user_data["email"], "roles": user_data["roles"]}
     )
@@ -60,10 +70,6 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token_standard(form_data: OAuth2PasswordRequestForm = Depends()):
-    """
-    Standard OAuth2 token endpoint for compatibility with FastAPI docs authentication.
-    This is the same as /login but follows OAuth2 standard naming.
-    """
     user = await get_user_by_email(form_data.username)
     if not user or not verify_password(form_data.password, user.get("hashed_password", "")):
         raise HTTPException(

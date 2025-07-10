@@ -1,7 +1,11 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
-from app.settings import SECRET_KEY, ALGORITHM
+from app.settings import SECRET_KEY, ALGORITHM, CACHE_EXPIRE_SECONDS
+from app.database import redis_client
+from bson import json_util
+import json
+from app.models import TokenData
 from app.database import users_collection
 
 oauth2_scheme = OAuth2PasswordBearer(
@@ -10,14 +14,38 @@ oauth2_scheme = OAuth2PasswordBearer(
     description="Enter your JWT token here"
 )
 
+async def _cache_user(user: dict):
+    """Helper – store user doc in Redis under both email and username keys."""
+    if not user:
+        return
+    # BSON -> JSON string that preserves ObjectId
+    encoded = json_util.dumps(user)
+    await redis_client.set(f"user:{user['email']}", encoded, ex=CACHE_EXPIRE_SECONDS)
+    username = user.get("username")
+    if username:
+        await redis_client.set(f"user_by_username:{username}", encoded, ex=CACHE_EXPIRE_SECONDS)
+
 async def get_user_by_email(email: str):
-    return await users_collection.find_one({"email": email})
+    key = f"user:{email}"
+    cached = await redis_client.get(key)
+    if cached:
+        return json_util.loads(cached)
+    user = await users_collection.find_one({"email": email})
+    if user:
+        await _cache_user(user)
+    return user
 
 async def get_user_by_username(username: str):
-    return await users_collection.find_one({"username": username})
+    key = f"user_by_username:{username}"
+    cached = await redis_client.get(key)
+    if cached:
+        return json_util.loads(cached)
+    user = await users_collection.find_one({"username": username})
+    if user:
+        await _cache_user(user)
+    return user
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
-    from app.models import TokenData
     
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

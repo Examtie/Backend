@@ -1,16 +1,15 @@
 from fastapi import APIRouter, Depends, Query, Body, HTTPException
 from bson import ObjectId
 from app.models import *
-from app.database import users_collection, exam_files_collection, bookmarks_collection, exam_questions_collection, exam_submissions_collection, exam_categories_collection
+from app.database import users_collection, exam_files_collection, bookmarks_collection, exam_questions_collection, exam_submissions_collection, exam_categories_collection, redis_client
 from app.dependencies import get_current_user, require_roles, get_user_by_email
 from typing import List, Any
 from pydantic import BaseModel
 from datetime import date, timedelta
 import redis.asyncio as redis_async
-from app.database import redis_client
 from datetime import datetime
-
-from app.settings import ALL_ROLES
+from bson import json_util
+from app.settings import ALL_ROLES, CACHE_EXPIRE_SECONDS, STREAK_TTL_SECONDS
 
 router = APIRouter(
     prefix="/user/api/v1",
@@ -34,6 +33,11 @@ async def update_profile(update: UpdateProfile, current_user: dict = Depends(get
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     if update_data:
         await users_collection.update_one({"_id": current_user["_id"]}, {"$set": update_data})
+        updated_copy = current_user.copy()
+        updated_copy.update(update_data)
+        await redis_client.set(f"user:{current_user['email']}", json_util.dumps(updated_copy), ex=3600)
+        if updated_copy.get("username"):
+            await redis_client.set(f"user_by_username:{updated_copy['username']}", json_util.dumps(updated_copy), ex=3600)
     updated_user = await get_user_by_email(current_user["email"])
     if not updated_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -136,11 +140,18 @@ async def list_bookmarks(current_user: dict = Depends(get_current_user)):
 
 @router.get("/exams/{exam_id}/questions", response_model=List[dict])
 async def get_exam_questions(exam_id: str):
+    cache_key = f"exam_questions:{exam_id}"
+    cached = await redis_client.get(cache_key)
+    if cached:
+        from bson import json_util
+        return json_util.loads(cached)
     questions = []
     async for q in exam_questions_collection.find({"exam_id": exam_id}):
         q["id"] = str(q["_id"])
         del q["_id"]
         questions.append(q)
+    from bson import json_util
+    await redis_client.set(cache_key, json_util.dumps(questions), ex=CACHE_EXPIRE_SECONDS)
     return questions
 
 @router.post("/exams/{exam_id}/submit")
@@ -217,6 +228,11 @@ async def save_exam_progress(
 # === EXAM CATEGORY MANAGEMENT FOR USERS ===
 @router.get("/exam-categories", response_model=List[ExamCategoryOut])
 async def user_list_exam_categories():
+    cache_key = "exam_categories:all"
+    cached = await redis_client.get(cache_key)
+    if cached:
+        from bson import json_util
+        return [ExamCategoryOut(**cat) for cat in json_util.loads(cached)]
     categories = []
     async for cat in exam_categories_collection.find():
         categories.append(ExamCategoryOut(
@@ -224,11 +240,20 @@ async def user_list_exam_categories():
             name=cat["name"],
             description=cat.get("description", ""),
             english_name=cat.get("english_name", "")
-        ))
-    return categories
+        ).model_dump())
+    from bson import json_util
+    await redis_client.set(cache_key, json_util.dumps(categories), ex=CACHE_EXPIRE_SECONDS)
+    # cast back to pydantic models
+    return [ExamCategoryOut(**cat) for cat in categories]
+
 
 @router.get("/exam-categories/{category_id}", response_model=ExamCategoryOut)
 async def user_get_exam_category(category_id: str):
+    cache_key = f"exam_category:{category_id}"
+    cached = await redis_client.get(cache_key)
+    if cached:
+        from bson import json_util
+        return ExamCategoryOut(**json_util.loads(cached))
     try:
         oid = ObjectId(category_id)
     except:
@@ -236,12 +261,16 @@ async def user_get_exam_category(category_id: str):
     cat = await exam_categories_collection.find_one({"_id": oid})
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
-    return ExamCategoryOut(
+
+    result = ExamCategoryOut(
         id=str(cat["_id"]),
         name=cat["name"],
         description=cat.get("description", ""),
         english_name=cat.get("english_name", "")
     )
+    from bson import json_util
+    await redis_client.set(cache_key, json_util.dumps(result.model_dump()), ex=CACHE_EXPIRE_SECONDS)
+    return result
 
 @router.get("/exams-with-progress", response_model=List[dict])
 async def user_list_exams_with_progress(
@@ -392,6 +421,7 @@ async def update_user_streak(user_id: str):
     data = await redis_client.hgetall(key)
     if not data:
         await redis_client.hset(key, mapping={"current": 1, "last_date": today_str, "revives_used": 0})
+        await redis_client.expire(key, STREAK_TTL_SECONDS)
         return
 
     last_date_str = data.get("last_date")
@@ -412,6 +442,7 @@ async def update_user_streak(user_id: str):
         else:
             current = 1  # reset streak
     await redis_client.hset(key, mapping={"current": current, "last_date": today_str, "revives_used": revives})
+    await redis_client.expire(key, STREAK_TTL_SECONDS)
 
 class StreakInfo(BaseModel):
     current: int
