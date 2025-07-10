@@ -4,7 +4,6 @@ from jose import jwt, JWTError
 from app.settings import SECRET_KEY, ALGORITHM, CACHE_EXPIRE_SECONDS
 from app.database import redis_client
 from bson import json_util
-import json
 from app.models import TokenData
 from app.database import users_collection
 
