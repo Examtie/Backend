@@ -18,36 +18,32 @@ PUBLIC_STORAGE_URL = os.getenv("PUBLIC_STORAGE_URL")  # optional—frontend publ
 
 S3_CONFIGURED = bool(S3_ENDPOINT and S3_ACCESS_KEY and S3_SECRET_KEY and STORAGE_BUCKET)
 
-if S3_CONFIGURED:
-    try:
-        s3 = boto3.client(
+# The boto3 client will be created lazily so that a temporary connectivity issue
+# (or running outside Docker where `minio` DNS is unknown) doesn’t permanently
+# disable the storage backend during module import.
+_s3_client = None
+
+def _get_client():
+    """Create (or return existing) boto3 client. Raises on failure."""
+    global _s3_client
+    if _s3_client is None:
+        _s3_client = boto3.client(
             "s3",
             region_name=STORAGE_REGION,
             endpoint_url=S3_ENDPOINT,
             aws_access_key_id=S3_ACCESS_KEY,
             aws_secret_access_key=S3_SECRET_KEY,
         )
+    return _s3_client
 
-        # Ensure bucket exists (try/catch to handle race conditions)
-        existing_buckets = [b["Name"] for b in s3.list_buckets().get("Buckets", [])]
-        if STORAGE_BUCKET not in existing_buckets:
-            try:
-                s3.create_bucket(Bucket=STORAGE_BUCKET)
-                print(f"[storage] Created bucket '{STORAGE_BUCKET}' on S3-compatible endpoint {S3_ENDPOINT}")
-            except Exception as exc:
-                print(f"[storage] Failed to create bucket '{STORAGE_BUCKET}': {exc}")
-    except Exception as e:
-        print(f"[storage] Error initialising S3 client: {e}")
-        s3 = None
-        S3_CONFIGURED = False
-else:
-    s3 = None
 
 
 async def upload_to_s3(file: UploadFile) -> str:
     """Upload an `UploadFile` to the configured MinIO/S3 bucket and return a public URL."""
-    if not S3_CONFIGURED or not s3:
+    if not S3_CONFIGURED:
         raise HTTPException(status_code=500, detail="S3 storage is not configured")
+
+    s3 = _get_client()
 
     if not file or not file.filename:
         raise HTTPException(status_code=400, detail="No file provided or filename is empty")
@@ -55,6 +51,15 @@ async def upload_to_s3(file: UploadFile) -> str:
     try:
         await file.seek(0)  # make sure we read from the start
         object_key = f"{uuid.uuid4()}_{file.filename}"
+
+        # Ensure bucket exists (do this lazily once)
+        try:
+            s3.head_bucket(Bucket=STORAGE_BUCKET)
+        except Exception:
+            try:
+                s3.create_bucket(Bucket=STORAGE_BUCKET)
+            except Exception:
+                pass  # bucket likely already exists or we lack perms; proceed anyway
 
         s3.upload_fileobj(
             file.file,
