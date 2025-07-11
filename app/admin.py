@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.database import users_collection, system_settings_collection, exam_files_collection, exam_categories_collection
 from app.dependencies import get_current_user, require_roles
 from app.models import UserOut, ExamFileCreate, ExamFileUpdate, ExamFileOut, UpdateProfile, AdminUserOut, UpdateUserRole, ExamCategoryCreate, ExamCategoryUpdate, ExamCategoryOut
-from app.storage.r2_client import upload_to_r2
+from app.storage.r2_client import upload_to_r2, R2_CONFIGURED
 from datetime import datetime
 from app.settings import ADMIN_ROLE, ALL_ROLES
 import json
@@ -266,6 +266,7 @@ async def test_r2_configuration(
 ):
     """Test endpoint to check R2 configuration"""
     from app.storage.r2_client import R2_CONFIGURED, r2, BUCKET
+    from app.storage.s3_client import S3_CONFIGURED
     import os
     
     config_status = {
@@ -319,7 +320,14 @@ async def upload_exam_file(
     if (int(essay_count) < 1 and int(choice_count) < 1):
         raise HTTPException(status_code=400, detail="ต้องมีอย่างน้อย 1 ใน 2 (essay_count หรือ choice_count) ที่เป็น 1 ขึ้นไป")
 
-    file_url = await upload_to_r2(file)
+    # Decide which storage backend to use
+    from app.storage.s3_client import upload_to_s3, S3_CONFIGURED
+    if S3_CONFIGURED:
+        file_url = await upload_to_s3(file)
+    elif R2_CONFIGURED:
+        file_url = await upload_to_r2(file)
+    else:
+        raise HTTPException(status_code=500, detail="No storage backend configured")
     # Parse answer_key JSON if provided
     answer_key_data = None
     if answer_key:
