@@ -32,6 +32,15 @@ if R2_CONFIGURED:
         )
         BUCKET = os.getenv("R2_BUCKET_NAME")
         
+        # Ensure bucket exists
+        existing_buckets = r2.list_buckets().get("Buckets", [])
+        if not any(b["Name"] == BUCKET for b in existing_buckets):
+            try:
+                r2.create_bucket(Bucket=BUCKET)
+                print(f"Created bucket '{BUCKET}' in local S3 store")
+            except Exception as create_exc:
+                print(f"Failed to create bucket '{BUCKET}': {create_exc}")
+        
         S3_ENDPOINT = s3_endpoint
         
         print(f"R2 Configuration initialized:")
@@ -75,6 +84,11 @@ async def upload_to_r2(file: UploadFile) -> str:
             ExtraArgs={"ACL": "public-read"}  # Make file public
         )
         
+        public_base = os.getenv("PUBLIC_STORAGE_URL")
+        if public_base:
+            public_base = public_base.rstrip("/")
+            return f"{public_base}/{BUCKET}/{file_id}"
+        # Fallback to original endpoint (may be internal)
         return f"{s3_endpoint}/{file_id}"
             
     except Exception as e:
