@@ -8,7 +8,7 @@ from app.models import TokenData
 from app.database import users_collection
 
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/token",
+    tokenUrl="/api/token",
     scheme_name="Bearer Token",
     description="Enter your JWT token here"
 )
