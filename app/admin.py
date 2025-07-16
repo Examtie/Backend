@@ -320,21 +320,60 @@ async def upload_exam_file(
     if (int(essay_count) < 1 and int(choice_count) < 1):
         raise HTTPException(status_code=400, detail="ต้องมีอย่างน้อย 1 ใน 2 (essay_count หรือ choice_count) ที่เป็น 1 ขึ้นไป")
 
+        # ===== Handle file type & optional conversion =====
+    pdf_upload: UploadFile
+    if file.content_type == "application/pdf":
+        pdf_upload = file
+    else:
+        docx_types = {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/msword",
+        }
+        if file.content_type in docx_types:
+            try:
+                from docx2pdf import convert  # runtime import
+            except ImportError:
+                raise HTTPException(
+                    status_code=500,
+                    detail="DOCX conversion library not installed on server (docx2pdf).",
+                )
+            import tempfile, os
+            from pathlib import Path
+            # write DOCX to temp and convert
+            async with tempfile.TemporaryDirectory() as tmpdir:
+                docx_path = os.path.join(tmpdir, file.filename)
+                contents = await file.read()
+                with open(docx_path, "wb") as f:
+                    f.write(contents)
+                try:
+                    convert(docx_path, tmpdir)
+                except Exception as exc:
+                    raise HTTPException(status_code=500, detail=f"Conversion failed: {exc}")
+                pdf_path = os.path.join(tmpdir, f"{Path(file.filename).stem}.pdf")
+                if not os.path.exists(pdf_path):
+                    raise HTTPException(status_code=500, detail="Conversion failed: PDF not created")
+                from fastapi import UploadFile as _UF
+                pdf_upload = _UF(
+                    filename=f"{Path(file.filename).stem}.pdf",
+                    file=open(pdf_path, "rb"),
+                    content_type="application/pdf",
+                )
+        else:
+            raise HTTPException(status_code=400, detail="Only PDF or DOCX files are supported.")
+
     # Decide which storage backend to use
     from app.storage.s3_client import upload_to_s3, S3_CONFIGURED
     if S3_CONFIGURED:
-        file_url = await upload_to_s3(file)
+        file_url = await upload_to_s3(pdf_upload)
     elif R2_CONFIGURED:
-        file_url = await upload_to_r2(file)
+        file_url = await upload_to_r2(pdf_upload)
     else:
         raise HTTPException(status_code=500, detail="No storage backend configured")
     # Parse answer_key JSON if provided
-    answer_key_data = None
-    if answer_key:
-        try:
-            answer_key_data = json.loads(answer_key)
-        except Exception:
-            raise HTTPException(status_code=400, detail="answer_key must be valid JSON")
+    try:
+        answer_key_data = json.loads(answer_key)
+    except Exception:
+        raise HTTPException(status_code=400, detail="answer_key must be valid JSON")
 
     record = {
         "title": title,
