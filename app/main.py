@@ -30,7 +30,6 @@ app.add_middleware(
 from app.admin import router as admin_router
 from app.authention import router as auth_router
 from app.user import router as user_router
-from app.upload import router as upload_router
 from app.market import router as market_router
 
 import logging
