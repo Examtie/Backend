@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 # Load environment variables from the Backend directory
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI = "mongodb://root:4pAZSYdNSgdj1pKlyt6wIkK7MYJkVruDiI0RgxzCZEzzKu622K70cEd9DRSpcqiZ@igk0gc0c4ggkcw0000gwsog8:27017"
 DATABASE_NAME = os.getenv("DATABASE_NAME", "myapp")
 
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
