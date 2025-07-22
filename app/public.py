@@ -79,3 +79,16 @@ async def public_search_market_items(
     async for doc in market_items_collection.find(query).limit(limit):
         items.append(to_market_item_out(doc))
     return items
+
+@router.get("/market/items/{item_id}", response_model=MarketItemOut)
+async def public_get_market_item(item_id: str):
+    """Retrieve a single market item by its *id* (public)."""
+    try:
+        oid = ObjectId(item_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid item ID format")
+
+    doc = await market_items_collection.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return to_market_item_out(doc)
