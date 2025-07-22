@@ -31,6 +31,7 @@ from app.admin import router as admin_router
 from app.authention import router as auth_router
 from app.user import router as user_router
 from app.market import router as market_router
+from app.public import router as public_router
 
 import logging
 from app.database import client as mongo_client, redis_client
@@ -59,6 +60,7 @@ app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(market_router)
+app.include_router(public_router)
 ############
 
 @app.post("/token", response_model=Token, tags=["Authentication"])
