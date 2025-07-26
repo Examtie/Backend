@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.settings import ALL_ROLES, REDIS_URL
@@ -12,6 +12,7 @@ app = FastAPI(
     title="Examtie Backend API", 
     version="1.0.0", 
     description="Project NSC",
+    root_path="/api",
     swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect",
     swagger_ui_init_oauth={
         "usePkceWithAuthorizationCodeGrant": True,
