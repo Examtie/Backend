@@ -1,5 +1,6 @@
 import requests
-import json, re 
+import json, re
+from json_repair import repair_json
 
 
 class Typhoon_API:
@@ -64,12 +65,12 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
 
         self.flashcard_from_prompt = """
 # ROLE 
-LANGUAGE IN FRONT AND BACK OF THE FLASHCARD DEPENDS ON CONTEXT LANGUAGE
-LOOK AT THE CONTEXT LANGUAGE DEPENDS ON THAT NOT ONLY ENGLISH YOU CAN USE ANY LANGUAGE
+YOU CAN USE ANY LANGUAGE NOT ONLY ENGLISH
 
 You are an advanced flashcard creator specializing in graduate and post-graduate level content. high-quality flashcards on the given topic. Follow these guidelines:
 
 # INSTRUCTIONS:
+  1. Check the context language and create flashcards in that language.
   2. Questions should be challenging and in-depth, suitable for graduate or post-graduate level study.
   3. Avoid basic definitions or questions that can be answered with a single word from the topic itself.
   4. Answers MUST BE CONCISE, but may contain multiple words or a short phrase when necessary for accuracy. Answers MUST NOT BE MORE THAN 5 WORDS LONG.
@@ -77,6 +78,7 @@ You are an advanced flashcard creator specializing in graduate and post-graduate
   6. Cover a diverse range of subtopics within the main topic to provide comprehensive coverage.
   7. Include questions that test understanding of concepts, theories, applications, and critical thinking.
   8. Avoid questions that can be answered with a simple "yes" or "no".
+  9. Complete All the flashcards in the JSON format provided below.
   
 # IMPORTANT
     - **Language** in Flashcard Question and Answer Depends On Context Language in FRONT AND BACK OF THE FLASHCARD THE WHOLE FLASHCARD DEPENDS ON CONTEXT LANGUAGE
@@ -104,18 +106,27 @@ Instead of "Which branch studies the human mind?", ask something like:
 Answer: "Confirmation bias"
 """
 
-    def json_formatter(self,data: str) -> str:
+
+
+    def json_formatter(self, data: str) -> str:
         math_2 = re.search(r'```json(.*?)```', data, re.DOTALL)
         if math_2:
             json_str = math_2.group(1).strip()
             json_str = json_str.replace('\\', '\\\\')
-
             try:
                 questions = json.loads(json_str)
                 return questions
             except json.JSONDecodeError as e:
                 print("JSON decoding error:", e)
-                return False
+                # Try to auto-fix common JSON issues
+                fixed_json_str = repair_json(json_str)
+                try:
+                    questions = json.loads(fixed_json_str)
+                    print("Auto-fixed JSON.")
+                    return questions
+                except Exception as e2:
+                    print("Auto-fix failed:", e2)
+                    return False
         else:
             print("JSON block not found.")
             return False
@@ -130,17 +141,12 @@ Answer: "Confirmation bias"
                 },
                 {
                     "role": "user",
-                    "content": "Context: " + context + "\nCreate exactly " + str(amount) + " Exams."
+                    "content": "เนื้อหา หรือ หัวข้อ: " + context + "\nสร้างข้อสอบจำนวน " + str(amount) + " ข้อ."
                 }
-            ],
-            "max_tokens": 8000,
-            "temperature": 0.6,
-            "top_p": 0.95,
-            "repetition_penalty": 1.05,
-            "stream": False
+            ]
         }
 
-        response = requests.post(self.api_url, headers=self.headers, json =payload)
+        response = requests.post(self.api_url, headers=self.headers, json=payload)
 
         if response.status_code == 200:
             result = response.json()
@@ -150,7 +156,7 @@ Answer: "Confirmation bias"
             raise Exception(f"Question generation failed: {response.status_code} - {response.text}")
     
     def generate_flashcards(self, topic: str, amount: int = 10) -> str:
-        print(f"สร้างแฟรการ์ด เกี่ยวกับ {topic}\nจำนวน {amount} แฟรชการ์ด.")
+        #print(f"สร้างแฟรการ์ด เกี่ยวกับ {topic}\nจำนวน {amount} แฟรชการ์ด.")
         payload = {
             "model": "typhoon-v2.1-12b-instruct",
             "messages": [
@@ -160,16 +166,17 @@ Answer: "Confirmation bias"
                 },
                 {
                     "role": "user",
-                    "content": f"สร้างแฟรการ์ด เกี่ยวกับ {topic}\nจำนวน {amount} แฟรชการ์ด."
+                    "content": f"สร้างแฟรการ์ด เกี่ยวกับ {topic} มัธยมศึกษาปีที่ 5 \nจำนวน {amount} แฟรชการ์ด."
                 }
-            ],
+            ]
         }
 
-        response = requests.post(self.api_url, headers=self.headers, data=json.dumps(payload))
+        response = requests.post(self.api_url, headers=self.headers, json=payload)
 
         if response.status_code == 200:
             result = response.json()
             message = result['choices'][0]['message']['content']
+            print(message)
             return self.json_formatter(message)
         else:
             raise Exception(f"Flashcard generation failed: {response.status_code} - {response.text}")

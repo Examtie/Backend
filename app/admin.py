@@ -8,6 +8,7 @@ from app.storage.r2_client import upload_to_r2, R2_CONFIGURED
 from datetime import datetime
 from app.settings import ADMIN_ROLE, ALL_ROLES
 import json
+from docx2pdf import convert 
 
 router = APIRouter(
     prefix="/admin/api/v1",
@@ -303,16 +304,27 @@ async def upload_exam_file(
     tags: str = Form(...),  # This will be the list of category IDs
     essay_count: int = Form(...),
     choice_count: int = Form(...),
-    answer_key: str = Form(None),  # JSON string mapping question -> answer
+    answer_key: str = Form(...),  # REQUIRED – JSON string mapping question number -> answer
     admin=Depends(require_roles(ADMIN_ROLE)),
     current_user=Depends(get_current_user)
 ):
     # Parse tags (accept comma-separated or JSON array)
     try:
-        if tags.strip().startswith("["):
-            tags_list = json.loads(tags)
-        else:
-            tags_list = [t.strip() for t in tags.split(",") if t.strip()]
+        tags_list = json.loads(tags)
+        # Validate each tag/category ID exists
+        if not isinstance(tags_list, list):
+            raise HTTPException(status_code=400, detail="tags must be a JSON array of category IDs")
+        valid_tag_ids = []
+        for tag_id in tags_list:
+            try:
+                oid = ObjectId(tag_id)
+            except Exception:
+                raise HTTPException(status_code=400, detail=f"Invalid category ID format: {tag_id}")
+            exists = await exam_categories_collection.count_documents({"_id": oid})
+            if exists == 0:
+                raise HTTPException(status_code=400, detail=f"Category not found for ID: {tag_id}")
+            valid_tag_ids.append(tag_id)
+        tags_list = valid_tag_ids
     except Exception:
         tags_list = []
 
@@ -369,11 +381,17 @@ async def upload_exam_file(
         file_url = await upload_to_r2(pdf_upload)
     else:
         raise HTTPException(status_code=500, detail="No storage backend configured")
-    # Parse answer_key JSON if provided
+    # Parse and validate answer_key JSON (required)
     try:
         answer_key_data = json.loads(answer_key)
     except Exception:
         raise HTTPException(status_code=400, detail="answer_key must be valid JSON")
+
+    if not isinstance(answer_key_data, dict) or not answer_key_data:
+        raise HTTPException(status_code=400, detail="answer_key must be a non-empty JSON object mapping question numbers to answers")
+
+    # Normalise keys to strings for consistent storage
+    answer_key_data = {str(k): v for k, v in answer_key_data.items()}
 
     record = {
         "title": title,

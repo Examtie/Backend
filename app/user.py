@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, Body, HTTPException
 from bson import ObjectId
 from app.models import *
-from app.database import users_collection, exam_files_collection, bookmarks_collection, exam_questions_collection, exam_submissions_collection, exam_categories_collection, redis_client
+from app.database import users_collection, exam_files_collection, bookmarks_collection, exam_questions_collection, exam_submissions_collection, exam_categories_collection, ai_exam_questions_collection, redis_client
 from app.dependencies import get_current_user, require_roles, get_user_by_email
 from typing import List, Any
 from pydantic import BaseModel
@@ -153,6 +153,29 @@ async def get_exam_questions(exam_id: str):
     from bson import json_util
     await redis_client.set(cache_key, json_util.dumps(questions), ex=CACHE_EXPIRE_SECONDS)
     return questions
+
+
+@router.get("/ai-exams/{record_id}", response_model=List[dict])
+async def get_ai_exam_questions(record_id: str, current_user: dict = Depends(get_current_user)):
+    """Retrieve AI-generated exam question set stored in ai_exam_questions_collection."""
+    try:
+        oid = ObjectId(record_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid record ID format")
+
+    doc = await ai_exam_questions_collection.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(status_code=404, detail="AI Exam not found")
+
+    # Authorization: allow only owner access
+    if doc.get("user_id") != str(current_user.get("_id") or current_user.get("id")):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    exam_list = doc.get("exam", [])
+    # Ensure each question has an id for frontend convenience
+    for idx, q in enumerate(exam_list):
+        q.setdefault("id", str(idx + 1))
+    return exam_list
 
 @router.post("/exams/{exam_id}/submit")
 async def submit_exam(

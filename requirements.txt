@@ -14,4 +14,4 @@ pytest-asyncio
 pymongo
 redis
 docx2pdf
-gradio_client
+pdfplumber
