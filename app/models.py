@@ -146,6 +146,12 @@ class ExamQuestion(BaseModel):
     question: str
     choices: Optional[List[str]] = None  # for multiple_choice
     answer: Optional[Union[str, List[str]]] = None  # สำหรับเฉลย (admin)
+    
+class ExamQuestion_history(BaseModel):
+    id: str
+    filename_or_prompt: str
+    created_at: datetime
+    data: List[ExamQuestion]
 
 class ExamAnswerCreate(BaseModel):
     question_id: str
@@ -196,7 +202,6 @@ class Flashcard(BaseModel):
 
 class FlashcardRecordOut(BaseModel):
     id: str
-    user_id: str
-    filename: str
+    filename_or_prompt: str
     created_at: datetime
     flashcards: List[Flashcard]

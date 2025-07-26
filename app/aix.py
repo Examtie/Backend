@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from datetime import datetime
 from bson import ObjectId
 
-from app.models import Flashcard, FlashcardRecordOut, ExamQuestion
+from app.models import Flashcard, FlashcardRecordOut, ExamQuestion, ExamQuestion_history
 from app.dependencies import get_current_user
 from app.database import flashcards_collection, ai_exam_questions_collection
 from app.settings import TPYTHON_API_KEY
@@ -11,14 +11,25 @@ from app.settings import TPYTHON_API_KEY
 
 from ai_runner.Typhoon import Typhoon_API
 from ai_runner.PDFExtrack import CLIENT_OCR
+from ai_runner.AAzure import Azzzure_API
 
 router = APIRouter(
     prefix="/ai/api/v1",
     tags=["ai"],
 )
 
-api_typhoon = Typhoon_API(api_key=TPYTHON_API_KEY)
+#api_typhoon = Typhoon_API(api_key=TPYTHON_API_KEY)
 Client_OCR = CLIENT_OCR()
+api_azure = Azzzure_API(api_key="Fh5w6tZj2Qgha4TZGSKAa5tq9QqKP7oummUj0iYByi5sSuRoV3n0JQQJ99BGACHYHv6XJ3w3AAAAACOGlvT5")
+
+def extract_flashcards(doc):
+    fc = doc.get("flashcards")
+    if isinstance(fc, dict) and "flashcards" in fc:
+        return fc["flashcards"]
+    elif isinstance(fc, list):
+        return fc
+    else:
+        return []
 
 # -----------------------------------------------------
 # Helper – placeholder OCR & LLM processing
@@ -36,7 +47,8 @@ async def _generate_flashcard(pdf_bytes: bytes = None, prompt: str = None, amoun
         raise HTTPException(status_code=400, detail="No context available for flashcard generation")
     print(f"Generating {amount} flashcards for context: {context}")
 
-    data = api_typhoon.generate_flashcards(topic=context, amount=amount)
+    #data = api_typhoon.generate_flashcards(topic=context, amount=amount)
+    data = api_azure.generate_flashcards(context=context, amount=amount)
     print(data)
 
     return data
@@ -49,13 +61,14 @@ async def _generate_exam(pdf_bytes: bytes = None, prompt: str = None, amount: in
         raise HTTPException(status_code=400, detail="Either PDF bytes or prompt must be provided")
     if pdf_bytes:
         print("Processing PDF bytes for exam generation...")
-        context = Client_OCR.ocr(pdf_bytes)
+        context = Client_OCR.ocr(pdf_bytes=pdf_bytes)
     else:
         context = prompt
     if not context:
         raise HTTPException(status_code=400, detail="No context available for exam generation")
 
-    questions = api_typhoon.generate_exam_questions(context=context, amount=amount)
+    #questions = api_typhoon.generate_exam_questions(context=context, amount=amount)
+    questions = api_azure.generate_exam_questions(context=context, amount=amount)
     return questions
 
 # -----------------------------------------------------
@@ -107,6 +120,34 @@ async def generate_flashcards(
 
     return flashcards_data['flashcards']
 
+@router.get("/flashcards/history", response_model=List[FlashcardRecordOut])
+async def list_flashcard_history(
+    limit: int = Query(20, ge=1, le=100, description="Number of history records to return"),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+    records: List[FlashcardRecordOut] = []
+    cursor = (
+        flashcards_collection.find({"user_id": user_id})
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+    async for doc in cursor:
+        filename_or_prompt = doc.get("filename", "")
+        if not filename_or_prompt:
+            filename_or_prompt = doc.get("prompt", "")
+            
+        records.append(
+            FlashcardRecordOut(
+                id=str(doc["_id"]),
+                filename_or_prompt=filename_or_prompt,
+                created_at=doc["created_at"],
+                flashcards=[Flashcard(**fc) for fc in extract_flashcards(doc)],
+            )
+        )
+    return records
+
+
 
 # -----------------------------------------------------
 # Exam Generation Routes
@@ -145,6 +186,13 @@ async def generate_exam_questions_text(
 ):
     """Generate exam questions based on a text prompt."""
     exam_data = await _generate_exam(prompt=prompt, amount=amount)
+    
+    # Ensure that exam_data is iterable (i.e. a list)
+    if not isinstance(exam_data, list):
+        raise HTTPException(
+            status_code=500,
+            detail="Exam question generation failed: Unexpected response format."
+        )
 
     record = {
         "user_id": str(current_user.get("_id") or current_user.get("id")),
@@ -154,54 +202,53 @@ async def generate_exam_questions_text(
     }
     await ai_exam_questions_collection.insert_one(record)
 
-    return [ExamQuestion(id=str(i + 1), type="multiple_choice", question=q.get("question"), choices=q.get("options"), answer=q.get("correct_answer")) for i, q in enumerate(exam_data)]
+    return [
+        ExamQuestion(
+            id=str(i + 1),
+            type="multiple_choice",
+            question=q.get("question"),
+            choices=q.get("options"),
+            answer=q.get("correct_answer")
+        )
+        for i, q in enumerate(exam_data)
+    ]
 
 
-@router.get("/flashcards/history", response_model=List[FlashcardRecordOut])
-async def list_flashcard_history(
+@router.get("/exam/history", response_model=List[ExamQuestion_history])
+async def list_exam_history(
     limit: int = Query(20, ge=1, le=100, description="Number of history records to return"),
     current_user: dict = Depends(get_current_user),
 ):
     user_id = str(current_user.get("_id") or current_user.get("id"))
-    records: List[FlashcardRecordOut] = []
+    records: List[ExamQuestion_history] = []
     cursor = (
-        flashcards_collection.find({"user_id": user_id})
+        ai_exam_questions_collection.find({"user_id": user_id})
         .sort("created_at", -1)
         .limit(limit)
     )
     async for doc in cursor:
-        records.append(
-            FlashcardRecordOut(
-                id=str(doc["_id"]),
-                user_id=doc["user_id"],
-                filename=doc["filename"],
-                created_at=doc["created_at"],
-                flashcards=[Flashcard(**fc) for fc in doc["flashcards"]],
+        questions = doc.get("exam", [])
+        if not isinstance(questions, list):
+            questions = []
+        for i, q in enumerate(questions):
+            file_or_prompt = doc.get("filename", "")
+            if file_or_prompt == "":
+                file_or_prompt = doc.get("prompt", "")
+            
+            records.append(
+                ExamQuestion_history(
+                    id=str(i + 1),
+                    filename_or_prompt=file_or_prompt,
+                    created_at=doc.get("created_at"),
+                    data=[
+                        ExamQuestion(
+                            id=str(i + 1),
+                            type="multiple_choice",
+                            question=q.get("question"),
+                            choices=q.get("options"),
+                            answer=q.get("correct_answer")
+                        )
+                    ]
+                )
             )
-        )
     return records
-
-
-@router.get("/exam/{record_id}", response_model=FlashcardRecordOut)
-async def get_flashcard_record(record_id: str, current_user: dict = Depends(get_current_user)):
-    try:
-        oid = ObjectId(record_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid record ID format")
-
-    doc = await flashcards_collection.find_one({"_id": oid})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Record not found")
-
-    user_id = str(current_user.get("_id") or current_user.get("id"))
-    if doc.get("user_id") != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this record")
-
-    return FlashcardRecordOut(
-        id=str(doc["_id"]),
-        user_id=doc["user_id"],
-        filename=doc["filename"],
-        created_at=doc["created_at"],
-        flashcards=[Flashcard(**fc) for fc in doc["flashcards"]],
-    )
-

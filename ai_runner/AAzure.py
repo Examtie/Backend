@@ -1,17 +1,16 @@
 import requests
 import json, re
 from json_repair import repair_json
+from openai import AzureOpenAI
 
 
-class Typhoon_API:
+class Azzzure_API:
     def __init__(self, api_key: str):
-        self.api_url = "https://api.opentyphoon.ai/v1/chat/completions"
-        self.api_key = api_key
-        self.headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
-
+        self.client = AzureOpenAI(
+    api_version="2024-12-01-preview",
+    azure_endpoint="https://nmsr-mdkdg6wh-eastus2.cognitiveservices.azure.com/",
+    api_key=api_key
+)
         self.pdf_to_exam_system = """
 # ROLE:
 Act as an expert multiple-choice question generator for educational purposes.
@@ -107,77 +106,32 @@ Answer: "Confirmation bias"
 """
 
 
+    def ai_azure(self, prompt: str, system_prompt: str) -> str:
+        completion = self.client.chat.completions.create(
+            model="examtieai",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ]
+        )
 
-    def json_formatter(self, data: str) -> str:
-        math_2 = re.search(r'```json(.*?)```', data, re.DOTALL)
-        if math_2:
-            json_str = math_2.group(1).strip()
-            json_str = json_str.replace('\\', '\\\\')
-            try:
-                questions = json.loads(json_str)
-                return questions
-            except json.JSONDecodeError as e:
-                print("JSON decoding error:", e)
-                # Try to auto-fix common JSON issues
-                fixed_json_str = repair_json(json_str)
-                try:
-                    questions = json.loads(fixed_json_str)
-                    print("Auto-fixed JSON.")
-                    return questions
-                except Exception as e2:
-                    print("Auto-fix failed:", e2)
-                    return False
-        else:
-            print("JSON block not found.")
+        message = completion.choices[0].message.content
+        if message.startswith("```json"):
+            message = message.split("```json")[-1]
+            message = message.rsplit("```", 1)[0].strip()
+
+        try:
+            fixed_json_str = repair_json(message)
+            exam_data = json.loads(fixed_json_str)
+            return exam_data
+        except json.decoder.JSONDecodeError as e:
+            print("JSON decoding error:", e)
             return False
-
-    def generate_exam_questions(self, context: str, amount: int = 10) -> str:
-        payload = {
-            "model": "typhoon-v2.1-12b-instruct",
-            "messages": [
-                {
-                    "role": "system",
-                    "content": self.pdf_to_exam_system
-                },
-                {
-                    "role": "user",
-                    "content": "เนื้อหา หรือ หัวข้อ: " + context + "\nสร้างข้อสอบจำนวน " + str(amount) + " ข้อ."
-                }
-            ]
-        }
-
-        response = requests.post(self.api_url, headers=self.headers, json=payload)
-
-        if response.status_code == 200:
-            result = response.json()
-            message = result['choices'][0]['message']['content']
-            print(message)
-            return self.json_formatter(message)
-        else:
-            raise Exception(f"Question generation failed: {response.status_code} - {response.text}")
     
-    def generate_flashcards(self, topic: str, amount: int = 10) -> str:
-        #print(f"สร้างแฟรการ์ด เกี่ยวกับ {topic}\nจำนวน {amount} แฟรชการ์ด.")
-        payload = {
-            "model": "typhoon-v2.1-12b-instruct",
-            "messages": [
-                {
-                    "role": "system",
-                    "content": self.flashcard_from_prompt
-                },
-                {
-                    "role": "user",
-                    "content": f"สร้างแฟรการ์ด เกี่ยวกับ {topic} มัธยมศึกษาปีที่ 5 \nจำนวน {amount} แฟรชการ์ด."
-                }
-            ]
-        }
-
-        response = requests.post(self.api_url, headers=self.headers, json=payload)
-
-        if response.status_code == 200:
-            result = response.json()
-            message = result['choices'][0]['message']['content']
-            print(message)
-            return self.json_formatter(message)
-        else:
-            raise Exception(f"Flashcard generation failed: {response.status_code} - {response.text}")
+    def generate_exam_questions(self, context: str, amount: int = 10) -> str:
+        #prompt = f"สร้างข้อสอบจำนวน  {amount} ข้อ และข้อสอบเนื้อหาเกี่ยวกับ : {context}"
+        return self.ai_azure(f"สร้างข้อสอบจำนวน  {amount} ข้อ และข้อสอบเนื้อหาเกี่ยวกับ : {context}", self.pdf_to_exam_system)
+    
+    def generate_flashcards(self, context: str, amount: int = 10) -> str:
+        #message = self.ai_azure(f"สร้างแฟรการ์ด เกี่ยวกับ {topic} มัธยมศึกษาปีที่ 5 \nจำนวน {amount} แฟรชการ์ด.", self.flashcard_from_prompt)
+        return self.ai_azure(f"สร้างแฟรการ์ด เกี่ยวกับ {context} มัธยมศึกษาปีที่ 5 \nจำนวน {amount} แฟรชการ์ด.", self.flashcard_from_prompt)
