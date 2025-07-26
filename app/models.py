@@ -147,11 +147,11 @@ class ExamQuestion(BaseModel):
     choices: Optional[List[str]] = None  # for multiple_choice
     answer: Optional[Union[str, List[str]]] = None  # สำหรับเฉลย (admin)
     
-class ExamQuestion_history(BaseModel):
+class ExamRecordOut(BaseModel):
     id: str
     filename_or_prompt: str
     created_at: datetime
-    data: List[ExamQuestion]
+    exam_questions: List[ExamQuestion]
 
 class ExamAnswerCreate(BaseModel):
     question_id: str

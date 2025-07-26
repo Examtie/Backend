@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from datetime import datetime
 from bson import ObjectId
 
-from app.models import Flashcard, FlashcardRecordOut, ExamQuestion, ExamQuestion_history
+from app.models import Flashcard, FlashcardRecordOut, ExamQuestion, ExamRecordOut
 from app.dependencies import get_current_user
 from app.database import flashcards_collection, ai_exam_questions_collection
 from app.settings import TPYTHON_API_KEY
@@ -214,41 +214,41 @@ async def generate_exam_questions_text(
     ]
 
 
-@router.get("/exam/history", response_model=List[ExamQuestion_history])
+@router.get("/exam/history", response_model=List[ExamRecordOut])
 async def list_exam_history(
     limit: int = Query(20, ge=1, le=100, description="Number of history records to return"),
     current_user: dict = Depends(get_current_user),
 ):
     user_id = str(current_user.get("_id") or current_user.get("id"))
-    records: List[ExamQuestion_history] = []
+    records: List[ExamRecordOut] = []
     cursor = (
         ai_exam_questions_collection.find({"user_id": user_id})
         .sort("created_at", -1)
         .limit(limit)
     )
     async for doc in cursor:
+        file_or_prompt = doc.get("filename", "") or doc.get("prompt", "")
         questions = doc.get("exam", [])
+        # If questions isn't a list, set it to an empty list.
         if not isinstance(questions, list):
             questions = []
-        for i, q in enumerate(questions):
-            file_or_prompt = doc.get("filename", "")
-            if file_or_prompt == "":
-                file_or_prompt = doc.get("prompt", "")
-            
-            records.append(
-                ExamQuestion_history(
-                    id=str(i + 1),
-                    filename_or_prompt=file_or_prompt,
-                    created_at=doc.get("created_at"),
-                    data=[
-                        ExamQuestion(
-                            id=str(i + 1),
-                            type="multiple_choice",
-                            question=q.get("question"),
-                            choices=q.get("options"),
-                            answer=q.get("correct_answer")
-                        )
-                    ]
+        exam_qs = []
+        for index, q in enumerate(questions):
+            exam_qs.append(
+                ExamQuestion(
+                    id=str(index + 1),
+                    type="multiple_choice",
+                    question=q.get("question"),
+                    choices=q.get("options"),
+                    answer=q.get("correct_answer")
                 )
             )
+        records.append(
+            ExamRecordOut(
+                id=str(doc.get("_id") or doc.get("id") or "0"),
+                filename_or_prompt=file_or_prompt,
+                created_at=doc.get("created_at"),
+                exam_questions=exam_qs
+            )
+        )
     return records
