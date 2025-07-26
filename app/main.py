@@ -32,12 +32,17 @@ from app.authention import router as auth_router
 from app.user import router as user_router
 from app.market import router as market_router
 from app.public import router as public_router
+from app.aix import router as ai_router
 
 import logging
 from app.database import client as mongo_client, redis_client
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("startup")
+
+# ------------
+# STARTUP EVENTS
+# ------------
 
 @app.on_event("startup")
 async def check_backend_dependencies():
@@ -56,12 +61,16 @@ async def check_backend_dependencies():
     except Exception as exc:
         logger.exception(f"❌ Redis connection failed {REDIS_URL}: %s", exc)
 
+# ------------
+# APP ROUTERS
+# ------------
+
 app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(market_router)
 app.include_router(public_router)
-############
+app.include_router(ai_router)
 
 @app.post("/token", response_model=Token, tags=["Authentication"])
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):

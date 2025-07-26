@@ -188,3 +188,15 @@ class MarketItemCreate(BaseModel):
     description: Optional[str] = None
     price: float
     image_url: Optional[str] = None
+
+# ------------------- FLASHCARD MODELS -------------------
+class Flashcard(BaseModel):
+    front: str
+    back: str
+
+class FlashcardRecordOut(BaseModel):
+    id: str
+    user_id: str
+    filename: str
+    created_at: datetime
+    flashcards: List[Flashcard]

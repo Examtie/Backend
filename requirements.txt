@@ -10,8 +10,8 @@ bcrypt
 requests
 boto3
 pytest
-httpx
 pytest-asyncio
 pymongo
 redis
 docx2pdf
+gradio_client

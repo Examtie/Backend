@@ -19,6 +19,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES_SECONDS
 
 STREAK_TTL_SECONDS = int(os.getenv("STREAK_TTL_SECONDS", 60 * 60 * 24 * 60))  # 60 days default
 
+TPYTHON_API_KEY = os.getenv("TPYTHON_API_KEY", "sk-niga")
+
 ADMIN_ROLE = "admin"
 USER_ROLE = "user"
 STAFF_ROLE = "staff"
