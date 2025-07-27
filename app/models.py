@@ -170,6 +170,12 @@ class Ai_ExamResult(BaseModel):
     total: int
     details: List[Dict[str, Any]]
 
+class AiSubmissionRecordOut(BaseModel):
+    id: str
+    exam_id: str
+    created_at: datetime
+    result: Ai_ExamResult
+
 class ExamAnswerOut(BaseModel):
     question_id: str
     answer: Union[str, List[str]]

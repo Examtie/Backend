@@ -3,9 +3,9 @@ from typing import List, Dict, Any
 from datetime import datetime
 from bson import ObjectId
 
-from app.models import Flashcard, FlashcardRecordOut, ExamQuestion, ExamRecordOut, Ai_ExamSubmission, Ai_ExamResult
+from app.models import Flashcard, FlashcardRecordOut, ExamQuestion, ExamRecordOut, Ai_ExamSubmission, Ai_ExamResult, AiSubmissionRecordOut
 from app.dependencies import get_current_user
-from app.database import flashcards_collection, ai_exam_questions_collection
+from app.database import flashcards_collection, ai_exam_questions_collection, ai_exam_submissions_collection
 from app.settings import TPYTHON_API_KEY, Azure_API_KEY, Azure_Endpoint, Azure_API_Version, Azure_Model
 
 
@@ -266,7 +266,17 @@ async def submit_exam(
         if is_correct:
             score += 1
 
-    return Ai_ExamResult(score=score, total=len(exam_questions), details=details)
+    result_obj = Ai_ExamResult(score=score, total=len(exam_questions), details=details)
+    # save submission record
+    submission_doc = {
+        "user_id": user_id,
+        "exam_id": submission.exam_id,
+        "created_at": datetime.utcnow(),
+        "result": result_obj.model_dump()
+    }
+    await ai_exam_submissions_collection.insert_one(submission_doc)
+
+    return result_obj
 
 @router.get("/exam/history", response_model=List[ExamRecordOut])
 async def list_exam_history(
@@ -306,3 +316,31 @@ async def list_exam_history(
             )
         )
     return records
+
+# -----------------------------------------------------
+# Submission History Route
+# -----------------------------------------------------
+
+@router.get("/exam/submission-history", response_model=List[AiSubmissionRecordOut])
+async def list_submission_history(
+    limit: int = Query(20, ge=1, le=100, description="Number of submission records to return"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Retrieve the current user's previous exam submissions along with their results."""
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+    submissions: List[AiSubmissionRecordOut] = []
+    cursor = (
+        ai_exam_submissions_collection.find({"user_id": user_id})
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+    async for doc in cursor:
+        submissions.append(
+            AiSubmissionRecordOut(
+                id=str(doc["_id"]),
+                exam_id=doc["exam_id"],
+                created_at=doc["created_at"],
+                result=Ai_ExamResult(**doc["result"])
+            )
+        )
+    return submissions
