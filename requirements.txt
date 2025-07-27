@@ -16,3 +16,4 @@ redis
 docx2pdf
 pdfplumber
 json-repair
+openai
