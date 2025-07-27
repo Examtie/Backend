@@ -22,6 +22,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES_SECONDS=43200
 
 # Azure API Configuration
 AZURE_API_KEY=abcdefg
+AZURE_MODEL=examtieai
+AZURE_ENDPOINT=https://azure.cognitiveservices.azure.com/
+AZURE_API_VERSION=2024-12-01-preview
 # Typhoon API Configuration
 TPYTHON_API_KEY=abcdefg
 

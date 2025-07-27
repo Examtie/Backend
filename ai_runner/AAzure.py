@@ -5,12 +5,13 @@ from openai import AzureOpenAI
 
 
 class Azzzure_API:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, azure_endpoint: str, api_version: str, Azure_Model: str):
         self.client = AzureOpenAI(
-    api_version="2024-12-01-preview",
-    azure_endpoint="https://nmsr-mdkdg6wh-eastus2.cognitiveservices.azure.com/",
-    api_key=api_key
-)
+            api_version=api_version,
+            azure_endpoint=azure_endpoint,
+            api_key=api_key
+        )
+        self.model = Azure_Model
         self.pdf_to_exam_system = """
 # ROLE:
 Act as an expert multiple-choice question generator for educational purposes.
@@ -108,7 +109,7 @@ Answer: "Confirmation bias"
 
     def ai_azure(self, prompt: str, system_prompt: str) -> str:
         completion = self.client.chat.completions.create(
-            model="examtieai",
+            model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}

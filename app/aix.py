@@ -6,7 +6,7 @@ from bson import ObjectId
 from app.models import Flashcard, FlashcardRecordOut, ExamQuestion, ExamRecordOut
 from app.dependencies import get_current_user
 from app.database import flashcards_collection, ai_exam_questions_collection
-from app.settings import TPYTHON_API_KEY, Azure_API_KEY
+from app.settings import TPYTHON_API_KEY, Azure_API_KEY, Azure_Endpoint, Azure_API_Version, Azure_Model
 
 
 from ai_runner.Typhoon import Typhoon_API
@@ -20,7 +20,7 @@ router = APIRouter(
 
 #api_typhoon = Typhoon_API(api_key=TPYTHON_API_KEY)
 Client_OCR = CLIENT_OCR()
-api_azure = Azzzure_API(api_key=Azure_API_KEY)
+api_azure = Azzzure_API(Azure_Model=Azure_Model, api_key=Azure_API_KEY, azure_endpoint=Azure_Endpoint, api_version=Azure_API_Version)
 
 def extract_flashcards(doc):
     fc = doc.get("flashcards")

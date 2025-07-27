@@ -99,7 +99,7 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
 
 headers = {
   'Content-Type': 'application/json',
-  'Authorization': 'Bearer sk-Y0wpsSTbFWtI7AQxtsCpXHOtm1fTcEZhZn0pfzHWW1h190KE'
+  'Authorization': 'Bearer sk-'
 }
 
 response = requests.request("POST", url, headers=headers, json=payload)

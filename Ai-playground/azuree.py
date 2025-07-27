@@ -2,9 +2,9 @@ import os, json
 from openai import AzureOpenAI
 
 client = AzureOpenAI(
-    api_version="2024-12-01-preview",
-    azure_endpoint="https://nmsr-mdkdg6wh-eastus2.cognitiveservices.azure.com/",
-    api_key="Fh5w6tZj2Qgha4TZGSKAa5tq9QqKP7oummUj0iYByi5sSuRoV3n0JQQJ99BGACHYHv6XJ3w3AAAAACOGlvT5"
+    api_version="",
+    azure_endpoint="",
+    api_key=""
 )
 
 x = """
