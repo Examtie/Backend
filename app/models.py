@@ -1,4 +1,4 @@
-from typing import List, Optional, Literal, Union
+from typing import List, Optional, Literal, Union, Dict, Any
 from pydantic import BaseModel, EmailStr, Field, field_validator, root_validator, model_validator
 from datetime import datetime
 
@@ -160,6 +160,15 @@ class ExamAnswerCreate(BaseModel):
 class ExamSubmissionCreate(BaseModel):
     exam_id: str
     answers: List[ExamAnswerCreate]
+    
+class Ai_ExamSubmission(BaseModel):
+    exam_id: str
+    responses: List[str]
+
+class Ai_ExamResult(BaseModel):
+    score: int
+    total: int
+    details: List[Dict[str, Any]]
 
 class ExamAnswerOut(BaseModel):
     question_id: str
