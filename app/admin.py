@@ -8,10 +8,12 @@ from app.storage.r2_client import upload_to_r2, R2_CONFIGURED
 from datetime import datetime
 from app.settings import ADMIN_ROLE, ALL_ROLES
 import json
-import io
+import io, time
 from docx2pdf import convert 
 
-import PyPDF2
+from ai_runner.PDFExtrack import CLIENT_OCR
+import pypdfium2, asyncio
+from docx import Document
 from app.database import exam_texts_collection
 
 router = APIRouter(
@@ -19,20 +21,32 @@ router = APIRouter(
     tags=["Admin"]
 )
 
-# Background OCR/Text extraction
-async def extract_and_store_text(exam_id: str, pdf_bytes: bytes):
+pdfOCR = CLIENT_OCR()
+
+async def extract_and_store_text(exam_id: str, file_bytes: bytes, content_type: str):
     try:
-        reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-        text_parts = []
-        for page in reader.pages:
-            try:
-                text_parts.append(page.extract_text() or "")
-            except Exception:
-                continue
-        full_text = "\n".join(text_parts)
+        extract_text = ""
+
+        if content_type == "application/pdf":
+            pdf_data = pypdfium2.PdfDocument(io.BytesIO(file_bytes))
+            pdf_page = len(pdf_data)
+
+            for x in range(pdf_page):
+                ocr_text = pdfOCR.ocr(
+                    pdf_bytes=file_bytes,
+                    page_num=x + 1,
+                    mode="default"
+                )
+                extract_text += ocr_text + "\n"
+                await asyncio.sleep(1)  # non-blocking sleep
+        else:
+            # Assume DOCX
+            doc = Document(io.BytesIO(file_bytes))
+            extract_text = "\n".join([p.text for p in doc.paragraphs])
+
         await exam_texts_collection.update_one(
             {"exam_id": exam_id},
-            {"$set": {"text": full_text}},
+            {"$set": {"text": extract_text}},
             upsert=True,
         )
     except Exception as e:
@@ -434,9 +448,14 @@ async def upload_exam_file(
     record["url"] = file_url
 
     # Schedule background text extraction
-    pdf_bytes = await pdf_upload.read() if hasattr(pdf_upload, 'read') else None
-    if pdf_bytes:
-        background_tasks.add_task(extract_and_store_text, str(result.inserted_id), pdf_bytes)
+    if file.content_type in {"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"}:
+        # Use original DOCX bytes stored earlier as 'contents'
+        if 'contents' in locals():
+            background_tasks.add_task(extract_and_store_text, str(result.inserted_id), contents, file.content_type)
+    else:
+        pdf_bytes = await pdf_upload.read() if hasattr(pdf_upload, 'read') else None
+        if pdf_bytes:
+            background_tasks.add_task(extract_and_store_text, str(result.inserted_id), pdf_bytes, "application/pdf")
 
     return ExamFileOut(**{**record, "id": str(result.inserted_id)})
 

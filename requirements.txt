@@ -15,7 +15,6 @@ pymongo
 redis
 docx2pdf
 pdfplumber
-PyPDF2
 json-repair
 openai
-
+python-docx
