@@ -6,7 +6,7 @@ from bson import ObjectId
 from app.models import Flashcard, FlashcardRecordOut, ExamQuestion, ExamRecordOut, Ai_ExamSubmission, Ai_ExamResult, AiSubmissionRecordOut
 from app.dependencies import get_current_user
 from app.database import flashcards_collection, ai_exam_questions_collection, ai_exam_submissions_collection
-from app.settings import TPYTHON_API_KEY, Azure_API_KEY, Azure_Endpoint, Azure_API_Version, Azure_Model
+from app.settings import Azure_API_KEY, Azure_Endpoint, Azure_API_Version, Azure_Model
 
 
 from ai_runner.Typhoon import Typhoon_API
