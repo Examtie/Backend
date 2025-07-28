@@ -18,3 +18,4 @@ pdfplumber
 json-repair
 openai
 python-docx
+ftfy
