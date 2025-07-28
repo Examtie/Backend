@@ -342,9 +342,9 @@ async def upload_exam_file(
     essay_count: int = Form(...),
     choice_count: int = Form(...),
     answer_key: str = Form(...),  # REQUIRED – JSON string mapping question number -> answer
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     admin=Depends(require_roles(ADMIN_ROLE)),
-    current_user=Depends(get_current_user),
-    background_tasks: BackgroundTasks
+    current_user=Depends(get_current_user)
 ):
     # Parse tags (accept comma-separated or JSON array)
     try:
@@ -370,7 +370,7 @@ async def upload_exam_file(
     if (int(essay_count) < 1 and int(choice_count) < 1):
         raise HTTPException(status_code=400, detail="ต้องมีอย่างน้อย 1 ใน 2 (essay_count หรือ choice_count) ที่เป็น 1 ขึ้นไป")
 
-        # ===== Handle file type & optional conversion =====
+    # ===== Handle file type & optional conversion =====
     pdf_upload: UploadFile
     if file.content_type == "application/pdf":
         pdf_upload = file
@@ -419,6 +419,7 @@ async def upload_exam_file(
         file_url = await upload_to_r2(pdf_upload)
     else:
         raise HTTPException(status_code=500, detail="No storage backend configured")
+        
     # Parse and validate answer_key JSON (required)
     try:
         answer_key_data = json.loads(answer_key)

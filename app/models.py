@@ -177,6 +177,21 @@ class AiSubmissionRecordOut(BaseModel):
     result: Ai_ExamResult
 
 
+class ExamAnswerOut(BaseModel):
+    question_id: str
+    answer: Union[str, List[str]]
+    is_correct: Optional[bool] = None
+    correct_answer: Optional[Union[str, List[str]]] = None
+
+class ExamSubmission(BaseModel):
+    exam_id: str
+    responses: List[str]
+
+class ExamResult(BaseModel):
+    score: int
+    total: int
+    details: List[Dict[str, Any]]
+
 class ExamSubmissionOut(BaseModel):
     id: str
     user_id: str

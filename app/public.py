@@ -9,6 +9,7 @@ from app.models import (
     ExamSubmissionCreate,
     ExamAnswerOut,
     ExamTextOut,
+    ExamCheckResult
 )
 from app.database import exam_files_collection, exam_questions_collection, exam_texts_collection, redis_client
 
