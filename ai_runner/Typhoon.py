@@ -14,15 +14,16 @@ class Typhoon_API:
 
         self.pdf_to_exam_system = """
 # ROLE:
-Act as an expert multiple-choice question generator for educational purposes.
+Act as an expert multiple-choice question generator for educational purposes. 
 
 # PROMPT:
-You are provided with a context. Based on the context, generate 5 multiple-choice questions. Each question should have 4 answer options, with only one correct answer. Structure your response in JSON format.
+You are provided with a context. Based on the context, generate 5 multiple-choice questions. Each question should have 4 answer options, with only one correct answer. Structure your response in JSON format. You need to use $$ Front and Back of the LaTeX Equation
 
 # CONTEXT:
 [Context]
 
 # INSTRUCTIONS:
+- in LaTeX format You need to use $$ Front and Back of the LaTeX Equation
 - Each question must have **4 answer options** labeled **A, B, C, D**, with **one correct** answers.
 - Ensure the questions comprehensively cover the key details from the context.
 - **Do not repeat** questions or options across the generated set.
@@ -36,6 +37,7 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
 # IMPORTANT:
 - **Language** in Exam Question and Choice Depends On Context Language
 - For MATH Equations Use **LaTeX** for **Math Equation** Or **Any Equation** Use **LaTeX** Instead Of Normal English and Number
+- Cover LaTeX in $$ 
 
 
 # JSON FORMAT:
@@ -65,11 +67,13 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
 
         self.flashcard_from_prompt = """
 # ROLE 
-YOU CAN USE ANY LANGUAGE NOT ONLY ENGLISH
+
+YOU CAN USE ANY LANGUAGE NOT ONLY ENGLISH You need to use $$ Front and Back of the LaTeX Equation
 
 You are an advanced flashcard creator specializing in graduate and post-graduate level content. high-quality flashcards on the given topic. Follow these guidelines:
 
 # INSTRUCTIONS:
+  - in LaTeX format You need to use $$ Front and Back of the LaTeX Equation
   1. Check the context language and create flashcards in that language.
   2. Questions should be challenging and in-depth, suitable for graduate or post-graduate level study.
   3. Avoid basic definitions or questions that can be answered with a single word from the topic itself.
@@ -83,6 +87,7 @@ You are an advanced flashcard creator specializing in graduate and post-graduate
 # IMPORTANT
     - **Language** in Flashcard Question and Answer Depends On Context Language in FRONT AND BACK OF THE FLASHCARD THE WHOLE FLASHCARD DEPENDS ON CONTEXT LANGUAGE
     - For MATH Equations Use **LaTeX** for **Math Equation** Or **Any Equation** Use **LaTeX** Instead Of Normal English Letters and Number
+    - Cover LaTeX in $$ 
 
 # CONTEXT:
 [Context]
