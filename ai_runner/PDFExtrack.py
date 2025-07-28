@@ -1,6 +1,7 @@
 import pdfplumber
 import requests
 from io import BytesIO
+from app.settings import TPYTHON_API_KEY
 from .typhoon_ocr_mod import ocr_document
 
 class CLIENT_OCR:
@@ -43,11 +44,19 @@ class CLIENT_OCR:
 
         return text
 
-    def ocr(self, file_url: str = None, pdf_bytes: str = None,page_num: int = 1) -> str:
-        markdown = ocr_document(
-            api_key="sk-Y0wpsSTbFWtI7AQxtsCpXHOtm1fTcEZhZn0pfzHWW1h190KE",
+    def ocr(self, file_url: str = None, pdf_bytes: str = None, page_num: int = 1, mode: str = "default") -> str:
+        if pdf_bytes is None:
+            if file_url is None:
+                raise ValueError("Either file_url or pdf_bytes must be provided.")
+            
+            response = requests.get(file_url, headers=self.headers)
+            pdf_bytes = response.content
+
+        text = ocr_document(
+            api_key=TPYTHON_API_KEY,
             pdf_or_image_path=pdf_bytes,
-            task_type="default",
+            task_type=mode,
             page_num=page_num
         )
-        print(markdown)
+        
+        return text
