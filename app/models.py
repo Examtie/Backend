@@ -204,6 +204,13 @@ class MarketItemOut(BaseModel):
     price: float
     image_url: Optional[str] = None
 
+class MarketTagCreate(BaseModel):
+    name: str
+
+class MarketTagOut(BaseModel):
+    id: str
+    name: str
+
 class MarketItemCreate(BaseModel):
     name: str
     description: Optional[str] = None

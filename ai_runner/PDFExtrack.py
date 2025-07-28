@@ -1,6 +1,7 @@
 import pdfplumber
 import requests
 from io import BytesIO
+from .typhoon_ocr_mod import ocr_document
 
 class CLIENT_OCR:
     def __init__(self):
@@ -21,7 +22,7 @@ class CLIENT_OCR:
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
         }
 
-    def ocr(self, file_url: str = None, pdf_bytes: str = None) -> str:
+    def pdf_to_text(self, file_url: str = None, pdf_bytes: str = None) -> str:
         print(pdf_bytes)
         if pdf_bytes:
             response = pdf_bytes
@@ -41,3 +42,13 @@ class CLIENT_OCR:
                     text += page.extract_text()
 
         return text
+
+    def ocr(self, file_url: str = None, pdf_bytes: str = None) -> str:
+        markdown = ocr_document(
+            api_key="",
+            file_url=file_url,
+            pdf_or_image_path="document.pdf",
+            task_type="default",
+            page_num=2
+        )
+        print(markdown)
