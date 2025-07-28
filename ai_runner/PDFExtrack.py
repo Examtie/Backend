@@ -43,12 +43,11 @@ class CLIENT_OCR:
 
         return text
 
-    def ocr(self, file_url: str = None, pdf_bytes: str = None) -> str:
+    def ocr(self, file_url: str = None, pdf_bytes: str = None,page_num: int = 1) -> str:
         markdown = ocr_document(
-            api_key="",
-            file_url=file_url,
-            pdf_or_image_path="document.pdf",
+            api_key="sk-Y0wpsSTbFWtI7AQxtsCpXHOtm1fTcEZhZn0pfzHWW1h190KE",
+            pdf_or_image_path=pdf_bytes,
             task_type="default",
-            page_num=2
+            page_num=page_num
         )
         print(markdown)

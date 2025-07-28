@@ -13,11 +13,12 @@ import re
 import io
 from io import BytesIO
 import tempfile
-import fitz 
+import pypdfium2
 from PIL import Image
 import subprocess
 import base64
 from typing import Any, Callable, Dict, List, Literal
+
 import random
 import ftfy
 from pypdf.generic import RectangleObject
@@ -344,7 +345,7 @@ def _mult(m: List[float], n: List[float]) -> List[float]:
     ]
     
 def _pdf_report(local_pdf_path: str, page_num: int) -> PageReport:
-    reader = PdfReader(local_pdf_path)
+    reader = PdfReader(io.BytesIO(local_pdf_path))
     page = reader.pages[page_num - 1]
     resources = page.get("/Resources", {})
     xobjects = resources.get("/XObject", {})
@@ -440,6 +441,36 @@ def get_anchor_text_from_image(img: Image.Image):
     text = f"""Page dimensions: {width:.1f}x{height:.1f}\n[Image 0x0 to {width:.0f}x{height:.0f}]\n"""
     return text
 
+def render_pdf_to_base64png(pdf_bytes: bytes, page_num: int, target_longest_image_dim: int = 2048) -> str:
+    # Load PDF from bytes
+    doc = pypdfium2.PdfDocument(pdf_bytes)
+    page = doc.get_page(page_num - 1)
+
+    # Render page to bitmap (scale can be adjusted for quality)
+    bitmap = page.render(scale=2.0)  # scale = zoom factor
+    image = bitmap.to_pil()  # Convert to PIL.Image
+
+    # Resize image while keeping aspect ratio
+    orig_w, orig_h = image.size
+    if orig_w >= orig_h:
+        new_w = target_longest_image_dim
+        new_h = int(target_longest_image_dim * orig_h / orig_w)
+    else:
+        new_h = target_longest_image_dim
+        new_w = int(target_longest_image_dim * orig_w / orig_h)
+
+    resized = image.resize((new_w, new_h), Image.LANCZOS)
+
+    # Encode to base64 PNG
+    buffer = io.BytesIO()
+    resized.save(buffer, format="PNG")
+    base64_png = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    # Clean up
+    page.close()
+    doc.close()
+
+    return base64_png
 def prepare_ocr_messages(
     pdf_or_image_path: str, 
     task_type: str = "default", 
@@ -510,7 +541,7 @@ def prepare_ocr_messages(
         )
         # Extract anchor text from the selected PDF page
         anchor_text = get_anchor_text(
-            filename,
+            filename_byte,
             page_num,
             pdf_engine="pdfreport",
             target_length=target_text_length,
@@ -534,8 +565,6 @@ def prepare_ocr_messages(
         return messages
     except IndexError:
         raise ValueError(f"Page number {page_num} is out of range for the document {pdf_or_image_path}")
-    except Exception as e:
-        raise ValueError(f"Error processing document: {str(e)}")
 
 def is_base64_string(input_string: str) -> bool:
     try:
@@ -545,6 +574,7 @@ def is_base64_string(input_string: str) -> bool:
         return False
 
 def ensure_image_in_path(input_string: str) -> str:
+    return input_string
     """
     Detect whether the input is a base64-encoded image or a file path.
 

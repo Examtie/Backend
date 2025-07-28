@@ -35,7 +35,7 @@ def check_pdf_utilities():
     
     return True
 
-pdf_utils_available = check_pdf_utilities()
+pdf_utils_available = True
 if not pdf_utils_available:
     message = ('PDF utilities are not available.'
             "Installation instructions for Poppler utilities:\n"
