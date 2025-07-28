@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form, BackgroundTasks
 from bson import ObjectId
 from typing import List, Optional
 from app.database import users_collection, system_settings_collection, exam_files_collection, exam_categories_collection
@@ -8,12 +8,35 @@ from app.storage.r2_client import upload_to_r2, R2_CONFIGURED
 from datetime import datetime
 from app.settings import ADMIN_ROLE, ALL_ROLES
 import json
+import io
 from docx2pdf import convert 
+
+import PyPDF2
+from app.database import exam_texts_collection
 
 router = APIRouter(
     prefix="/admin/api/v1",
     tags=["Admin"]
 )
+
+# Background OCR/Text extraction
+async def extract_and_store_text(exam_id: str, pdf_bytes: bytes):
+    try:
+        reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
+        text_parts = []
+        for page in reader.pages:
+            try:
+                text_parts.append(page.extract_text() or "")
+            except Exception:
+                continue
+        full_text = "\n".join(text_parts)
+        await exam_texts_collection.update_one(
+            {"exam_id": exam_id},
+            {"$set": {"text": full_text}},
+            upsert=True,
+        )
+    except Exception as e:
+        print(f"Text extraction failed for {exam_id}: {e}")
 
 # Helper
 def to_str_id(doc):
@@ -306,7 +329,8 @@ async def upload_exam_file(
     choice_count: int = Form(...),
     answer_key: str = Form(...),  # REQUIRED – JSON string mapping question number -> answer
     admin=Depends(require_roles(ADMIN_ROLE)),
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    background_tasks: BackgroundTasks
 ):
     # Parse tags (accept comma-separated or JSON array)
     try:
@@ -408,6 +432,12 @@ async def upload_exam_file(
     result = await exam_files_collection.insert_one(record)
     record["id"] = str(result.inserted_id)
     record["url"] = file_url
+
+    # Schedule background text extraction
+    pdf_bytes = await pdf_upload.read() if hasattr(pdf_upload, 'read') else None
+    if pdf_bytes:
+        background_tasks.add_task(extract_and_store_text, str(result.inserted_id), pdf_bytes)
+
     return ExamFileOut(**{**record, "id": str(result.inserted_id)})
 
 @router.put("/exam-files/{file_id}", response_model=ExamFileOut)

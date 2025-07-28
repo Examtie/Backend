@@ -1,9 +1,16 @@
-from fastapi import APIRouter, Query, HTTPException
-from typing import List
+from fastapi import APIRouter, Query, HTTPException, Body
+from pydantic import BaseModel
+from typing import List, Dict, Any
 from bson import ObjectId
 
-from app.models import ExamFileOut, ExamQuestion
-from app.database import exam_files_collection, exam_questions_collection
+from app.models import (
+    ExamFileOut,
+    ExamQuestion,
+    ExamSubmissionCreate,
+    ExamAnswerOut,
+    ExamTextOut,
+)
+from app.database import exam_files_collection, exam_questions_collection, exam_texts_collection, redis_client
 
 router = APIRouter(
     prefix="/public/api/v1",
@@ -79,6 +86,63 @@ async def public_search_market_items(
     async for doc in market_items_collection.find(query).limit(limit):
         items.append(to_market_item_out(doc))
     return items
+
+# === EXAM SUBMISSION ===
+
+
+@router.get("/exams/{exam_id}/text", response_model=ExamTextOut)
+async def get_exam_extracted_text(exam_id: str):
+    cache_key = f"exam_text:{exam_id}"
+    cached = await redis_client.get(cache_key)
+    if cached is not None:
+        return ExamTextOut(exam_id=exam_id, text=cached)
+    doc = await exam_texts_collection.find_one({"exam_id": exam_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Extracted text not found")
+    text = doc.get("text", "")
+    await redis_client.set(cache_key, text, ex=1800)  # cache 30min
+    return ExamTextOut(exam_id=exam_id, text=text)
+
+
+@router.post("/exams/{exam_id}/submit", response_model=ExamCheckResult)
+async def submit_exam_and_check(exam_id: str, submission: ExamSubmissionCreate = Body(...)):
+    """Accepts user's answers, compares with answer key, and returns result."""
+    if submission.exam_id != exam_id:
+        raise HTTPException(status_code=400, detail="exam_id in path and body mismatch")
+
+    # Map answers for quick lookup
+    answer_map: Dict[str, Any] = {ans.question_id: ans.answer for ans in submission.answers}
+
+    total = await exam_questions_collection.count_documents({"exam_id": exam_id})
+    questions_cursor = exam_questions_collection.find({"exam_id": exam_id})
+
+    correct = 0
+    details: List[ExamAnswerOut] = []
+
+    async for qdoc in questions_cursor:
+        qid = str(qdoc["_id"])
+        correct_answer = qdoc.get("answer")
+        user_answer = answer_map.get(qid)
+        is_correct = False
+        if user_answer is not None and correct_answer is not None:
+            if isinstance(correct_answer, list):
+                # Normalize lists (e.g., sort for unordered multiple selections)
+                is_correct = sorted(correct_answer) == sorted(user_answer) if isinstance(user_answer, list) else False
+            else:
+                # For strings: case-insensitive compare after stripping spaces
+                is_correct = str(correct_answer).strip().lower() == str(user_answer).strip().lower()
+        if is_correct:
+            correct += 1
+        details.append(
+            ExamAnswerOut(
+                question_id=qid,
+                answer=user_answer,
+                is_correct=is_correct,
+            )
+        )
+
+    wrong = total - correct
+    return ExamCheckResult(total=total, correct=correct, wrong=wrong, details=details)
 
 @router.get("/market/items/{item_id}", response_model=MarketItemOut)
 async def public_get_market_item(item_id: str):

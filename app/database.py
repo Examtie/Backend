@@ -19,3 +19,5 @@ market_tags_collection = db.get_collection("market_tags")
 ai_exam_questions_collection = db.get_collection("ai_exam_questions")
 ai_exam_submissions_collection = db.get_collection("ai_exam_submissions")
 flashcards_collection = db.get_collection("flashcards")
+# Collection to store extracted exam text
+exam_texts_collection = db.get_collection("exam_texts")

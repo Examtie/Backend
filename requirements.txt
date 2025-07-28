@@ -15,9 +15,7 @@ pymongo
 redis
 docx2pdf
 pdfplumber
+PyPDF2
 json-repair
-<<<<<<< HEAD
-typhoon-ocr
-=======
 openai
->>>>>>> 9f17136c9e86c9f3a68b9f1bb7ca2c5cb124aa03
+

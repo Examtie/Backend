@@ -176,10 +176,6 @@ class AiSubmissionRecordOut(BaseModel):
     created_at: datetime
     result: Ai_ExamResult
 
-class ExamAnswerOut(BaseModel):
-    question_id: str
-    answer: Union[str, List[str]]
-    is_correct: Optional[bool] = None
 
 class ExamSubmissionOut(BaseModel):
     id: str
@@ -187,6 +183,12 @@ class ExamSubmissionOut(BaseModel):
     exam_id: str
     answers: List[ExamAnswerOut]
     submitted_at: datetime
+
+class ExamCheckResult(BaseModel):
+    total: int
+    correct: int
+    wrong: int
+    details: List[ExamAnswerOut]
 
 # ------------------- MARKET MODELS -------------------
 
@@ -197,6 +199,7 @@ class AnswerCheckRequest(BaseModel):
 
 class AnswerCheckResult(BaseModel):
     correct: bool
+
 class MarketItemOut(BaseModel):
     id: str
     name: str
@@ -221,6 +224,11 @@ class MarketItemCreate(BaseModel):
 class Flashcard(BaseModel):
     front: str
     back: str
+
+class ExamTextOut(BaseModel):
+    exam_id: str
+    text: str
+
 
 class FlashcardRecordOut(BaseModel):
     id: str
