@@ -392,6 +392,7 @@ async def upload_exam_file(
             # write DOCX to temp and convert
             async with tempfile.TemporaryDirectory() as tmpdir:
                 docx_path = os.path.join(tmpdir, file.filename)
+                await file.seek(0)
                 contents = await file.read()
                 with open(docx_path, "wb") as f:
                     f.write(contents)
@@ -454,6 +455,7 @@ async def upload_exam_file(
         if 'contents' in locals():
             background_tasks.add_task(extract_and_store_text, str(result.inserted_id), contents, file.content_type)
     else:
+        await pdf_upload.seek(0)
         pdf_bytes = await pdf_upload.read() if hasattr(pdf_upload, 'read') else None
         if pdf_bytes:
             background_tasks.add_task(extract_and_store_text, str(result.inserted_id), pdf_bytes, "application/pdf")
