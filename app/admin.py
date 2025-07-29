@@ -448,14 +448,13 @@ async def upload_exam_file(
     result = await exam_files_collection.insert_one(record)
     record["id"] = str(result.inserted_id)
     record["url"] = file_url
-
+    await pdf_upload.seek(0)
     # Schedule background text extraction
     if file.content_type in {"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"}:
         # Use original DOCX bytes stored earlier as 'contents'
         if 'contents' in locals():
             background_tasks.add_task(extract_and_store_text, str(result.inserted_id), contents, file.content_type)
     else:
-        await pdf_upload.seek(0)
         pdf_bytes = await pdf_upload.read() if hasattr(pdf_upload, 'read') else None
         if pdf_bytes:
             background_tasks.add_task(extract_and_store_text, str(result.inserted_id), pdf_bytes, "application/pdf")
