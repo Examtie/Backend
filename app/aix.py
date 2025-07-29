@@ -73,7 +73,7 @@ async def _generate_exam(pdf_bytes: bytes = None, prompt: str = None, amount: in
 
 # -----------------------------------------------------
 # Routes
-# -----------------------------------------------------
+# -------------------------------------------------ไ----
 
 @router.post("/flashcards/generate-pdf", response_model=List[Flashcard])
 async def generate_flashcards(
@@ -260,8 +260,11 @@ async def submit_exam(
             "is_correct": is_correct
         }
         if not is_correct:
-            # Include the question text for incorrect responses
+            # Include explanation and question text only for incorrect answers
             detail["question"] = question.get("question")
+            why = question.get("Why_answer_this_one") or question.get("why_answer_this_one")
+            if why:
+                detail["why_answer_this_one"] = why
         details.append(detail)
         if is_correct:
             score += 1

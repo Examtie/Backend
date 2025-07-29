@@ -34,6 +34,7 @@ from app.user import router as user_router
 from app.market import router as market_router
 from app.public import router as public_router
 from app.aix import router as ai_router
+from app.mock_api import router as mock_exam_router
 
 import logging
 from app.database import client as mongo_client, redis_client
@@ -72,6 +73,7 @@ app.include_router(user_router)
 app.include_router(market_router)
 app.include_router(public_router)
 app.include_router(ai_router)
+app.include_router(mock_exam_router)
 
 @app.post("/token", response_model=Token, tags=["Authentication"])
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):

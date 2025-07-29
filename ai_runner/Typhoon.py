@@ -32,12 +32,14 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
 - **Language** in Exam Question and Choice Depends On Context Language
 - Math Question Use **LaTeX** for **Math Equation** Or **Any Equation** Use **LaTeX** Instead Of Normal English and Number
 - An Advance Question and Interesting Equation Use Skill to Solve But still in provided Context
+- Explain how to solve the question or equation in field `why_answer_this_one`
 
 
 # IMPORTANT:
 - **Language** in Exam Question and Choice Depends On Context Language
 - For MATH Equations Use **LaTeX** for **Math Equation** Or **Any Equation** Use **LaTeX** Instead Of Normal English and Number
 - Cover LaTeX in $$ 
+- Explain how to solve the question or equation in field `why_answer_this_one`
 
 
 # JSON FORMAT:
@@ -50,7 +52,8 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
             "C) Option text",
             "D) Option text"
         ],
-        "correct_answer": "A"
+        "correct_answer": "A",
+        "why_answer_this_one": "Explanation here"
     },
     {
         "question": "Question text here",
@@ -60,7 +63,8 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
             "C) Option text",
             "D) Option text"
         ],
-        "correct_answer": "B"
+        "correct_answer": "B",
+        "why_answer_this_one": "Explanation here"
     },
 ]
         """
