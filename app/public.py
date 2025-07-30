@@ -9,9 +9,11 @@ from app.models import (
     ExamSubmissionCreate,
     ExamAnswerOut,
     ExamTextOut,
-    ExamCheckResult
+    ExamCheckResult,
+    ExamCategoryOut
 )
-from app.database import exam_files_collection, exam_questions_collection, exam_texts_collection, redis_client
+from app.database import exam_files_collection, exam_questions_collection, exam_texts_collection, redis_client, exam_categories_collection
+from app.settings import CACHE_EXPIRE_SECONDS
 
 router = APIRouter(
     prefix="/public/api/v1",
@@ -59,6 +61,28 @@ async def get_exam_questions_public(exam_id: str):
     if not questions:
         raise HTTPException(status_code=404, detail="Questions not found")
     return questions
+
+@router.get("/exam-categories", response_model=List[ExamCategoryOut])
+async def public_list_exam_categories():
+    """Return all exam categories - no authentication required."""
+    cache_key = "exam_categories:all"
+    cached = await redis_client.get(cache_key)
+    if cached:
+        from bson import json_util
+        return [ExamCategoryOut(**cat) for cat in json_util.loads(cached)]
+    
+    categories = []
+    async for cat in exam_categories_collection.find():
+        categories.append(ExamCategoryOut(
+            id=str(cat["_id"]),
+            name=cat["name"],
+            description=cat.get("description", ""),
+            english_name=cat.get("english_name", "")
+        ).model_dump())
+        
+    from bson import json_util
+    await redis_client.set(cache_key, json_util.dumps(categories), ex=CACHE_EXPIRE_SECONDS)
+    return [ExamCategoryOut(**cat) for cat in categories]
 
 # === MARKET ===
 from app.market import to_market_item_out, market_items_collection, MarketItemOut
