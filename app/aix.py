@@ -153,6 +153,8 @@ async def list_flashcard_history(
 # Exam Generation Routes
 # -----------------------------------------------------
 
+import uuid  # Import the UUID module for generating unique IDs
+
 @router.post("/exam/generate-pdf", response_model=List[ExamQuestion])
 async def generate_exam_questions_pdf(
     file: UploadFile = File(None, description="Optional PDF file to convert into exam questions"),
@@ -167,18 +169,35 @@ async def generate_exam_questions_pdf(
 
     exam_data = await _generate_exam(pdf_bytes=pdf_bytes, amount=amount)
 
+    # Generate a custom ID for this generation
+    generation_id = str(uuid.uuid4())
+
     record = {
         "user_id": str(current_user.get("_id") or current_user.get("id")),
         "filename": file.filename,
         "created_at": datetime.utcnow(),
         "exam": exam_data,
+        "generation_id": generation_id,  # Add the custom ID to the record
     }
     await ai_exam_questions_collection.insert_one(record)
 
-    return [ExamQuestion(exam_id=current_user.get("_id"), id=str(i + 1), type="multiple_choice", question=q.get("question"), choices=q.get("options"), answer=q.get("correct_answer")) for i, q in enumerate(exam_data)]
+    return {
+        "generation_id": generation_id,  # Include the custom ID in the response
+        "questions": [
+            ExamQuestion(
+                exam_id=current_user.get("_id"),
+                id=str(i + 1),
+                type="multiple_choice",
+                question=q.get("question"),
+                choices=q.get("options"),
+                answer=q.get("correct_answer")
+            )
+            for i, q in enumerate(exam_data)
+        ]
+    }
 
 
-@router.post("/exam/generate-text", response_model=List[ExamQuestion])
+@router.post("/exam/generate-text", response_model=Dict[str, Any])
 async def generate_exam_questions_text(
     amount: int = Query(5, ge=1, le=100, description="Number of exam questions to generate"),
     prompt: str = Query(None, description="Optional prompt to guide exam question generation"),
@@ -186,32 +205,39 @@ async def generate_exam_questions_text(
 ):
     """Generate exam questions based on a text prompt."""
     exam_data = await _generate_exam(prompt=prompt, amount=amount)
-    
-    # Ensure that exam_data is iterable (i.e. a list)
+
+    # Ensure that exam_data is iterable (i.e., a list)
     if not isinstance(exam_data, list):
         raise HTTPException(
             status_code=500,
             detail="Exam question generation failed: Unexpected response format."
         )
 
+    # Generate a custom ID for this generation
+    generation_id = str(uuid.uuid4())
+
     record = {
         "user_id": str(current_user.get("_id") or current_user.get("id")),
         "prompt": prompt,
         "created_at": datetime.utcnow(),
         "exam": exam_data,
+        "generation_id": generation_id,  # Add the custom ID to the record
     }
     await ai_exam_questions_collection.insert_one(record)
 
-    return [
-        ExamQuestion(
-            id=str(i + 1),
-            type="multiple_choice",
-            question=q.get("question"),
-            choices=q.get("options"),
-            answer=q.get("correct_answer")
-        )
-        for i, q in enumerate(exam_data)
-    ]
+    return {
+        "generation_id": generation_id,  # Include the custom ID in the response
+        "questions": [
+            ExamQuestion(
+                id=str(i + 1),
+                type="multiple_choice",
+                question=q.get("question"),
+                choices=q.get("options"),
+                answer=q.get("correct_answer")
+            )
+            for i, q in enumerate(exam_data)
+        ]
+    }
 
 
 @router.post("/exam/submit", response_model=Ai_ExamResult)
@@ -225,7 +251,7 @@ async def submit_exam(
     """
     # Retrieve the exam record using the exam_id from the submission
     try:
-        exam_record = await ai_exam_questions_collection.find_one({"_id": ObjectId(submission.exam_id)})
+        exam_record = await ai_exam_questions_collection.find_one({"generation_id": submission.exam_id})
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid exam_id format")
         
