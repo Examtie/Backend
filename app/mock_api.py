@@ -326,10 +326,11 @@ async def analysis():
     return EXAM_DATA
 
 # 5) Exam file route ---------------------------------------------------------
-@router.get("/exam-file", response_model=ExamFileOut)
+@router.get("/exam-file", response_model=List[ExamFileOut])
 async def get_exam_file():
     """Return static ExamFileOut pointing to hosted PDF."""
-    return ExamFileOut(
+    
+    return [ExamFileOut(
         id="static-1",
         title="ข้อสอบเรื่องความน่าจะเป็น",
         description="ความน่าจถเป็น",
@@ -338,4 +339,4 @@ async def get_exam_file():
         uploaded_by="admin@admin.com",
         essay_count=0,
         choice_count=10,
-    )
+    )]
