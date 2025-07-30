@@ -175,7 +175,7 @@ async def generate_exam_questions_pdf(
     }
     await ai_exam_questions_collection.insert_one(record)
 
-    return [ExamQuestion(id=str(i + 1), type="multiple_choice", question=q.get("question"), choices=q.get("options"), answer=q.get("correct_answer")) for i, q in enumerate(exam_data)]
+    return [ExamQuestion(exam_id=current_user.get("_id"), id=str(i + 1), type="multiple_choice", question=q.get("question"), choices=q.get("options"), answer=q.get("correct_answer")) for i, q in enumerate(exam_data)]
 
 
 @router.post("/exam/generate-text", response_model=List[ExamQuestion])
