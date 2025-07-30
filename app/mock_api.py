@@ -1,8 +1,13 @@
-from fastapi import APIRouter, HTTPException, status, Query
-from typing import List, Dict, Any
+from datetime import datetime
+from fastapi import APIRouter, HTTPException, status, Query, Depends, Path
+from typing import List, Dict, Any, Optional
+from bson import ObjectId
+from pydantic import BaseModel, Field
 
 # Re-use central models
 from app.models import ExamQuestion, ExamAnswerCreate, ExamSubmissionCreate, Ai_ExamResult, ExamFileOut
+from app.database import mock_exam_submissions
+from app.dependencies import get_current_user
 
 # -----------------------------
 # Mock Exam Dataset (in-memory)
@@ -120,21 +125,58 @@ EXAM_DATA: List[Dict[str, Any]] = [
     },
 ]
 
+
+EXAM_METADATA: list[Dict[str, Any]] = [
+    ExamFileOut(
+        id="static-1",
+        title="ข้อสอบเรื่องความน่าจะเป็น",
+        description="ความน่าจถเป็น",
+        tags=["possiblity", "math", "exam"],
+        url="https://cdn.regenxyy.me/student_exam.pdf",
+        uploaded_by="admin@admin.com",
+        essay_count=0,
+        choice_count=10,
+    )
+]
+
 # -----------------------------
 # Router Definition
 # -----------------------------
+# Response Models
+class SubmissionSummary(BaseModel):
+    id: str = Field(..., alias="_id")
+    exam_id: str
+    score: int
+    total: int
+    submitted_at: datetime
+    
+    class Config:
+        json_encoders = {
+            ObjectId: str,
+            datetime: lambda dt: dt.isoformat()
+        }
+        allow_population_by_field_name = True
+
+class SubmissionList(BaseModel):
+    submissions: List[SubmissionSummary]
+    total: int
+
 router = APIRouter(prefix="/mock", tags=["mock_exam"])
 
 
 # 1) Submit route -----------------------------------------------------------
 @router.post("/submit", response_model=Ai_ExamResult)
-async def submit(payload: ExamSubmissionCreate):
+async def submit(
+    payload: ExamSubmissionCreate,
+    current_user: dict = Depends(get_current_user)
+):
     if len(payload.answers) != len(EXAM_DATA):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Number of responses does not match number of exam questions.",
         )
 
+    user_id = str(current_user.get("_id") or current_user.get("id"))
     score = 0
     details: List[Dict[str, Any]] = []
     # Map answers by question_id for quick lookup
@@ -146,16 +188,104 @@ async def submit(payload: ExamSubmissionCreate):
         is_correct = (user_ans or "").upper() == correct.upper()
         if is_correct:
             score += 1
-        details.append(
-            {
-                "question_id": str(idx),
-                "user_answer": user_ans,
-                "correct_answer": correct,
-                "is_correct": is_correct,
-            }
-        )
+            
+        # Only include explanation for incorrect answers
+        detail = {
+            "question_id": str(idx),
+            "user_answer": user_ans,
+            "correct_answer": correct,
+            "is_correct": is_correct,
+        }
+        if not is_correct:
+            detail["why_answer_this_one"] = q.get("Why_answer_this_one") or q.get("why_answer_this_one")
+            detail["question"] = q["question"]
+            
+        details.append(detail)
+
+    # Save submission to MongoDB
+    submission_doc = {
+        "user_id": user_id,
+        "exam_id": payload.exam_id,
+        "answers": [
+            {"question_id": ans.question_id, "answer": ans.answer}
+            for ans in payload.answers
+        ],
+        "score": score,
+        "total": len(EXAM_DATA),
+        "submitted_at": datetime.utcnow(),
+        "details": details
+    }
+    
+    result = await mock_exam_submissions.insert_one(submission_doc)
+    submission_doc["_id"] = str(result.inserted_id)
+
+    # Add exam title/description to the saved submission
+    submission_doc["exam_title"] = "Mock Exam"  # Could be dynamic based on exam_id
+    submission_doc["exam_description"] = "Practice exam with sample questions"
+    
+    result = await mock_exam_submissions.insert_one(submission_doc)
+    submission_doc["_id"] = str(result.inserted_id)
 
     return Ai_ExamResult(score=score, total=len(EXAM_DATA), details=details)
+
+
+# 2) Get submission history -------------------------------------------------
+@router.get("/submissions", response_model=SubmissionList)
+async def get_submission_history(
+    skip: int = 0,
+    limit: int = 10,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a paginated list of user's exam submissions with basic info"""
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+    
+    # Get total count
+    total = await mock_exam_submissions.count_documents({"user_id": user_id})
+    
+    # Get paginated submissions
+    cursor = mock_exam_submissions.find(
+        {"user_id": user_id}
+    ).sort("submitted_at", -1).skip(skip).limit(limit)
+    
+    submissions = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
+        submissions.append(doc)
+    
+    return {"submissions": submissions, "total": total}
+
+
+# 3) Get submission details -------------------------------------------------
+@router.get("/submissions/{submission_id}", response_model=dict)
+async def get_submission_details(
+    submission_id: str = Path(..., description="The ID of the submission to retrieve"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get detailed results for a specific submission"""
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+    
+    try:
+        submission = await mock_exam_submissions.find_one({
+            "_id": ObjectId(submission_id),
+            "user_id": user_id
+        })
+    except:
+        raise HTTPException(status_code=400, detail="Invalid submission ID")
+    
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    # Convert ObjectId to string for JSON serialization
+    submission["_id"] = str(submission["_id"])
+    
+    # Include exam data if needed
+    submission["exam_data"] = {
+        "title": submission.get("exam_title", "Mock Exam"),
+        "description": submission.get("exam_description", "Practice exam"),
+        "total_questions": submission.get("total", len(EXAM_DATA))
+    }
+    
+    return submission
 
 
 # 2) Get Why-Answer route ----------------------------------------------------

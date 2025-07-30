@@ -21,3 +21,5 @@ ai_exam_submissions_collection = db.get_collection("ai_exam_submissions")
 flashcards_collection = db.get_collection("flashcards")
 # Collection to store extracted exam text
 exam_texts_collection = db.get_collection("exam_texts")
+# Collection for mock exam submissions
+mock_exam_submissions = db.get_collection("mock_exam_submissions")
