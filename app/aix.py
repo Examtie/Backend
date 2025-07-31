@@ -7,7 +7,7 @@ from app.models import Flashcard, FlashcardRecordOut, ExamQuestion, ExamRecordOu
 from app.dependencies import get_current_user
 from app.database import flashcards_collection, ai_exam_questions_collection, ai_exam_submissions_collection
 from app.settings import Azure_API_KEY, Azure_Endpoint, Azure_API_Version, Azure_Model
-
+import uuid
 
 from ai_runner.Typhoon import Typhoon_API
 from ai_runner.PDFExtrack import CLIENT_OCR
@@ -178,7 +178,7 @@ async def generate_exam_questions_pdf(
     return [ExamQuestion(id=str(i + 1), type="multiple_choice", question=q.get("question"), choices=q.get("options"), answer=q.get("correct_answer")) for i, q in enumerate(exam_data)]
 
 
-@router.post("/exam/generate-text", response_model=List[ExamQuestion])
+@router.post("/exam/generate-text", response_model=Dict[str, Any])
 async def generate_exam_questions_text(
     amount: int = Query(5, ge=1, le=100, description="Number of exam questions to generate"),
     prompt: str = Query(None, description="Optional prompt to guide exam question generation"),
@@ -194,7 +194,10 @@ async def generate_exam_questions_text(
             detail="Exam question generation failed: Unexpected response format."
         )
 
+    generation_id = str(uuid.uuid4())
+
     record = {
+        "generation_id": generation_id,
         "user_id": str(current_user.get("_id") or current_user.get("id")),
         "prompt": prompt,
         "created_at": datetime.utcnow(),
@@ -202,18 +205,20 @@ async def generate_exam_questions_text(
     }
     await ai_exam_questions_collection.insert_one(record)
 
-    return [
-        ExamQuestion(
-            id=str(i + 1),
-            type="multiple_choice",
-            question=q.get("question"),
-            choices=q.get("options"),
+    return {
+        "generation_id": generation_id,
+        "questions": [
+            ExamQuestion(
+                id=str(i + 1),
+                type="multiple_choice",
+                question=q.get("question"),
+                choices=q.get("options"),
             answer=q.get("correct_answer"),
             why_answer_this_one=q.get("why_answer_this_one"),
             what_do_i_read=q.get("what_do_i_read")
         )
         for i, q in enumerate(exam_data)
-    ]
+    ]}
 
 
 @router.post("/exam/submit", response_model=Ai_ExamResult)
@@ -227,7 +232,7 @@ async def submit_exam(
     """
     # Retrieve the exam record using the exam_id from the submission
     try:
-        exam_record = await ai_exam_questions_collection.find_one({"_id": ObjectId(submission.exam_id)})
+        exam_record = await ai_exam_questions_collection.find_one({"generation_id": submission.exam_id})
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid exam_id format")
         
