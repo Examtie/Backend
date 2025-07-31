@@ -146,6 +146,8 @@ class ExamQuestion(BaseModel):
     question: str
     choices: Optional[List[str]] = None  # for multiple_choice
     answer: Optional[Union[str, List[str]]] = None  # สำหรับเฉลย (admin)
+    why_answer_this_one: Optional[str] = None
+    what_do_i_read: Optional[str] = None
     
 class ExamRecordOut(BaseModel):
     id: str

@@ -208,7 +208,9 @@ async def generate_exam_questions_text(
             type="multiple_choice",
             question=q.get("question"),
             choices=q.get("options"),
-            answer=q.get("correct_answer")
+            answer=q.get("correct_answer"),
+            why_answer_this_one=q.get("why_answer_this_one"),
+            what_do_i_read=q.get("what_do_i_read")
         )
         for i, q in enumerate(exam_data)
     ]
@@ -253,18 +255,16 @@ async def submit_exam(
         correct_answer = question.get("correct_answer")
         user_answer = submission.responses[idx]
         is_correct = user_answer == correct_answer
+        # Always include question text and explanations in the response
         detail = {
             "question_id": str(idx + 1),
+            "question": question.get("question"),
             "correct_answer": correct_answer,
             "user_answer": user_answer,
-            "is_correct": is_correct
+            "is_correct": is_correct,
+            "why_answer_this_one": question.get("why_answer_this_one") or question.get("Why_answer_this_one"),
+            "what_do_i_read": question.get("what_do_i_read")
         }
-        if not is_correct:
-            # Include explanation and question text only for incorrect answers
-            detail["question"] = question.get("question")
-            why = question.get("Why_answer_this_one") or question.get("why_answer_this_one")
-            if why:
-                detail["why_answer_this_one"] = why
         details.append(detail)
         if is_correct:
             score += 1
