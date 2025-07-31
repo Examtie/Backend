@@ -141,6 +141,7 @@ class BookmarkOut(BaseModel):
     created_at: datetime
 
 class ExamQuestion(BaseModel):
+    exam_id: Optional[str] = None  # For public questions, exam_id is not required
     id: str
     type: Literal["multiple_choice", "fill", "essay"]
     question: str

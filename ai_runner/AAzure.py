@@ -18,7 +18,7 @@ class Azzzure_API:
 Act as an expert multiple-choice question generator for educational purposes.
 
 # PROMPT:
-You are provided with a context. Based on the context, generate 5 multiple-choice questions. Each question should have 4 answer options, with only one correct answer. Structure your response in JSON format.
+You are provided with a context. Based on the context, generate 5 multiple-choice questions. Each question should have 4 answer options, with only one correct answer. Structure your response in JSON format. Cover latex equation in $...$ (for example, $x=e^2$)
 
 # CONTEXT:
 [Context]
@@ -90,7 +90,7 @@ You are an advanced flashcard creator specializing in graduate and post-graduate
   
 # IMPORTANT
     - **Language** in Flashcard Question and Answer Depends On Context Language in FRONT AND BACK OF THE FLASHCARD THE WHOLE FLASHCARD DEPENDS ON CONTEXT LANGUAGE
-    - For MATH Equations Use **LaTeX** for **Math Equation** Or **Any Equation** Use **LaTeX** Instead Of Normal English Letters and Number
+    - For MATH Equations Use **LaTeX** for **Math Equation** Or **Any Equation** Use **LaTeX** Instead Of Normal English Letters and Number. To use LaTeX cover the equation with $...$
 
 # CONTEXT:
 [Context]
