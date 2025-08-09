@@ -33,3 +33,9 @@ SELLER_ROLE = "seller"
 
 
 ALL_ROLES = [ADMIN_ROLE, USER_ROLE, STAFF_ROLE, SELLER_ROLE]
+
+# Temporary bootstrap admin (created on startup if no admin exists)
+BOOTSTRAP_ADMIN_EMAIL = os.getenv("BOOTSTRAP_ADMIN_EMAIL", "admin@example.com")
+BOOTSTRAP_ADMIN_USERNAME = os.getenv("BOOTSTRAP_ADMIN_USERNAME", "admin")
+BOOTSTRAP_ADMIN_FULLNAME = os.getenv("BOOTSTRAP_ADMIN_FULLNAME", "Administrator")
+BOOTSTRAP_ADMIN_PASSWORD = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "ChangeMe123!")

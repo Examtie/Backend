@@ -29,7 +29,9 @@ async def register(user_in: UserIn):
         "hashed_password": hash_password(user_data.pop("password")),
         "created_at": datetime.utcnow(),
         "bio": "New to Examtie!",
-        "profile_image": "https://jwt.io/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fjwt-flower.f20616b0.png&w=3840&q=75"
+        "profile_image": "https://jwt.io/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fjwt-flower.f20616b0.png&w=3840&q=75",
+        # Enforce default role for all self-registrations
+        "roles": ["user"],
     })
 
     result = await users_collection.insert_one(user_data)
@@ -41,7 +43,7 @@ async def register(user_in: UserIn):
         await redis_client.set(f"user_by_username:{user_data['username']}", json_util.dumps(user_data), ex=CACHE_EXPIRE_SECONDS)
 
     access_token = create_access_token(
-        data={"sub": user_data["email"], "roles": user_data["roles"]}
+        data={"sub": user_data["email"], "roles": user_data.get("roles", ["user"])}
     )
     return UserOut(
         id=str(result.inserted_id),

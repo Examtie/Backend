@@ -2,11 +2,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.settings import ALL_ROLES, REDIS_URL
+from app.settings import ALL_ROLES, REDIS_URL, BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_USERNAME, BOOTSTRAP_ADMIN_FULLNAME, BOOTSTRAP_ADMIN_PASSWORD
 from app.models import UserOut, UpdateProfile, Token
 from app.database import users_collection
 from app.dependencies import get_current_user, require_roles, get_user_by_email
-from app.auth import verify_password, create_access_token
+from app.auth import verify_password, create_access_token, hash_password
 
 app = FastAPI(
     title="Examtie Backend API", 
@@ -62,6 +62,34 @@ async def check_backend_dependencies():
         logger.info("✅ Redis connection successful")
     except Exception as exc:
         logger.exception(f"❌ Redis connection failed {REDIS_URL}: %s", exc)
+
+    # Ensure there is at least one admin user; if not, create a temporary one
+    try:
+        from app.database import users_collection
+        admin_exists = await users_collection.find_one({"roles": {"$in": ["admin"]}})
+        if not admin_exists:
+            # Also check by email to avoid duplicates if roles changed
+            existing = await users_collection.find_one({"email": BOOTSTRAP_ADMIN_EMAIL})
+            if existing and "admin" not in existing.get("roles", []):
+                await users_collection.update_one({"_id": existing["_id"]}, {"$addToSet": {"roles": "admin"}})
+                logger.info("✅ Promoted existing bootstrap admin email to admin role: %s", BOOTSTRAP_ADMIN_EMAIL)
+            elif not existing:
+                doc = {
+                    "email": BOOTSTRAP_ADMIN_EMAIL,
+                    "username": BOOTSTRAP_ADMIN_USERNAME,
+                    "full_name": BOOTSTRAP_ADMIN_FULLNAME,
+                    "hashed_password": hash_password(BOOTSTRAP_ADMIN_PASSWORD),
+                    "roles": ["admin"],
+                    "bio": "Temporary admin account (set env to customize)",
+                    "profile_image": "https://jwt.io/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fjwt-flower.f20616b0.png&w=3840&q=75",
+                    "created_at": __import__("datetime").datetime.utcnow(),
+                }
+                await users_collection.insert_one(doc)
+                logger.info("✅ Created bootstrap admin account: %s / username: %s", BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_USERNAME)
+        else:
+            logger.info("✅ Admin user already exists; bootstrap admin not needed")
+    except Exception as exc:
+        logger.exception("❌ Failed to ensure bootstrap admin: %s", exc)
 
 # ------------
 # APP ROUTERS

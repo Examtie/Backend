@@ -1,26 +1,16 @@
 from typing import List, Optional, Literal, Union, Dict, Any
-from pydantic import BaseModel, EmailStr, Field, field_validator, root_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, root_validator, model_validator, ConfigDict
 from datetime import datetime
 
 from app.settings import ALL_ROLES
 
 class UserIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     email: EmailStr
     password: str = Field(min_length=8)
     full_name: str
     username: str = Field(min_length=3, max_length=30)
-    roles: List[Literal["user", "admin", "staff"]] = ["user"]
-    
-    @field_validator("roles", mode="before")
-    @classmethod
-    def validate_roles(cls, v):
-        if isinstance(v, list):
-            for role in v:
-                if role not in ALL_ROLES:
-                    raise ValueError(f"Role '{role}' is not allowed. Choose from {ALL_ROLES}.")
-        elif v not in ALL_ROLES:
-            raise ValueError(f"Role '{v}' is not allowed. Choose from {ALL_ROLES}.")
-        return v
+    # Note: roles field intentionally removed to prevent clients from setting roles during registration
 
 class UserOut(BaseModel):
     id: Optional[str] = None
@@ -55,8 +45,8 @@ class UpdateProfile(BaseModel):
     profile_image: Optional[str] = None
 
 class ExamCategoryCreate(BaseModel):
-    name: str = Field(..., example="วิทยาศาสตร์")
-    description: Optional[str] = Field(None, example="หมวดวิชาวิทยาศาสตร์")
+    name: str = Field(..., json_schema_extra={"example": "วิทยาศาสตร์"})
+    description: Optional[str] = Field(None, json_schema_extra={"example": "หมวดวิชาวิทยาศาสตร์"})
     english_name: Optional[str] = Field(None, json_schema_extra={"example": "Science"})
 
 class ExamCategoryUpdate(BaseModel):
