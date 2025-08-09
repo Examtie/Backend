@@ -68,6 +68,16 @@ def _choose_provider(
         if provider == "cerebras" and not base_url:
             base_url = "https://api.cerebras.ai/v1"
 
+        # Normalize OpenAI-compatible base_url to include /v1 suffix
+        if base_url:
+            bu = base_url.strip()
+            if not bu.endswith("/"):
+                bu = bu
+            # Append /v1 if not present as a path segment
+            if not bu.rstrip("/").endswith("/v1"):
+                bu = bu.rstrip("/") + "/v1"
+            base_url = bu
+
         client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
         used_model = model or "gpt-4o-mini"
 
@@ -145,6 +155,42 @@ def _choose_provider(
 
     # Default fallback
     return api_azure
+
+
+    @router.post("/provider/test", dependencies=[Depends(rate_limit_dependency)])
+    async def test_provider_settings(
+        current_user: dict = Depends(get_current_user),
+        x_provider: str | None = Header(None, alias="X-Provider"),
+        x_api_key: str | None = Header(None, alias="X-API-Key"),
+        x_model: str | None = Header(None, alias="X-Model"),
+        x_base_url: str | None = Header(None, alias="X-Base-Url"),
+    ):
+        """Quickly validate BYO provider headers by doing a minimal no-op request.
+        For Azure: uses server default unless BYO is specified. Returns { status: 'ok' } if credentials look valid.
+        """
+        try:
+            adapter = _choose_provider(x_provider, x_api_key, x_model, x_base_url)
+            # perform a tiny probe with a deterministic minimal prompt
+            probe = None
+            try:
+                probe = adapter.generate_flashcards(context="test connectivity", amount=1)
+            except HTTPException:
+                raise
+            except Exception as e:
+                # Normalize provider errors
+                raise HTTPException(status_code=502, detail=f"Provider error: {str(e)[:200]}")
+
+            # Accept either list or dict with flashcards
+            if isinstance(probe, list):
+                return {"status": "ok"}
+            if isinstance(probe, dict) and ("flashcards" in probe):
+                return {"status": "ok"}
+            # Some providers may return empty or unexpected payloads; if no exception it still indicates validity
+            return {"status": "ok"}
+        except HTTPException as he:
+            raise he
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
 def extract_flashcards(doc):
     fc = doc.get("flashcards")
