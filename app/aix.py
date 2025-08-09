@@ -1,5 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status, Query
-from typing import List, Dict, Any
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status, Query, Header
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from bson import ObjectId
 
@@ -13,14 +13,138 @@ from ai_runner.Typhoon import Typhoon_API
 from ai_runner.PDFExtrack import CLIENT_OCR
 from ai_runner.AAzure import Azzzure_API
 
+# New provider clients
+from openai import OpenAI
+import requests
+import json
+
+from app.rate_limit import rate_limit_dependency
+
 router = APIRouter(
     prefix="/ai/api/v1",
     tags=["ai"],
 )
 
-#api_typhoon = Typhoon_API(api_key=TPYTHON_API_KEY)
 Client_OCR = CLIENT_OCR()
 api_azure = Azzzure_API(Azure_Model=Azure_Model, api_key=Azure_API_KEY, azure_endpoint=Azure_Endpoint, api_version=Azure_API_Version)
+
+
+def _choose_provider(
+    provider: Optional[str],
+    api_key: Optional[str],
+    model: Optional[str],
+    base_url: Optional[str],
+):
+    """
+    Returns a callable with shape generate_flashcards(context, amount) and generate_exam_questions(context, amount)
+    for the chosen provider. Supported providers:
+    - azure (uses existing Azzzure_API, ignores base_url)
+    - openrouter (OpenAI-compatible)
+    - cerebras (OpenAI-compatible)
+    - openai_compatible (custom base_url)
+    - ollama (OpenAI-compatible base_url like http://localhost:11434)
+    - gemini (Google Generative Language API)
+    Fallback to azure default config if not specified.
+    """
+
+    provider = (provider or "").lower()
+
+    if provider in ("", "azure"):
+        # Allow BYO Azure via provided api_key/base_url/model
+        if api_key or base_url or model:
+            return Azzzure_API(
+                Azure_Model=model or Azure_Model,
+                api_key=api_key or Azure_API_KEY,
+                azure_endpoint=base_url or Azure_Endpoint,
+                api_version=Azure_API_Version,
+            )
+        return api_azure
+
+    if provider in ("openrouter", "cerebras", "openai_compatible", "ollama"):
+        if not api_key:
+            raise HTTPException(status_code=400, detail="API key is required for this provider")
+        if provider == "openrouter" and not base_url:
+            base_url = "https://openrouter.ai/api/v1"
+        if provider == "cerebras" and not base_url:
+            base_url = "https://api.cerebras.ai/v1"
+
+        client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+        used_model = model or "gpt-4o-mini"
+
+        def _call(prompt: str, system_prompt: str):
+            resp = client.chat.completions.create(
+                model=used_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            content = resp.choices[0].message.content or ""
+            # Try to parse JSON block if fenced
+            if isinstance(content, str) and content.strip().startswith("```json"):
+                content = content.split("```json")[-1].rsplit("```", 1)[0].strip()
+            try:
+                return json.loads(content)
+            except Exception:
+                # Best-effort simple extraction of JSON brackets
+                start = content.find("[")
+                end = content.rfind("]")
+                if start != -1 and end != -1 and end > start:
+                    return json.loads(content[start : end + 1])
+                raise HTTPException(status_code=502, detail="Invalid JSON from model")
+
+        class Adapter:
+            def generate_exam_questions(self, context: str, amount: int = 10):
+                return _call(f"สร้างข้อสอบจำนวน  {amount} ข้อ และข้อสอบเนื้อหาเกี่ยวกับ : {context}", api_azure.pdf_to_exam_system)
+
+            def generate_flashcards(self, context: str, amount: int = 10):
+                return _call(f"สร้างแฟรการ์ด เกี่ยวกับ {context} มัธยมศึกษาปีที่ 5 \nจำนวน {amount} แฟรชการ์ด.", api_azure.flashcard_from_prompt)
+
+        return Adapter()
+
+    if provider == "gemini":
+        if not api_key:
+            raise HTTPException(status_code=400, detail="API key is required for Gemini")
+        # Simple REST call to Gemini 1.5 Pro style generateContent
+        used_model = model or "gemini-1.5-flash"
+
+        def _gemini_call(prompt: str, system_prompt: str):
+            url = f"https://generativelanguage.googleapis.com/v1/models/{used_model}:generateContent?key={api_key}"
+            payload = {
+                "contents": [
+                    {"role": "user", "parts": [{"text": system_prompt + "\n\n" + prompt}]}
+                ]
+            }
+            r = requests.post(url, json=payload, timeout=60)
+            if r.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"Gemini error: {r.text}")
+            data = r.json()
+            try:
+                text = data["candidates"][0]["content"]["parts"][0]["text"] or ""
+            except Exception:
+                raise HTTPException(status_code=502, detail="Unexpected Gemini response")
+            if isinstance(text, str) and text.strip().startswith("```json"):
+                text = text.split("```json")[-1].rsplit("```", 1)[0].strip()
+            try:
+                return json.loads(text)
+            except Exception:
+                start = text.find("[")
+                end = text.rfind("]")
+                if start != -1 and end != -1 and end > start:
+                    return json.loads(text[start : end + 1])
+                raise HTTPException(status_code=502, detail="Invalid JSON from Gemini")
+
+        class GAdapter:
+            def generate_exam_questions(self, context: str, amount: int = 10):
+                return _gemini_call(f"สร้างข้อสอบจำนวน  {amount} ข้อ และข้อสอบเนื้อหาเกี่ยวกับ : {context}", api_azure.pdf_to_exam_system)
+
+            def generate_flashcards(self, context: str, amount: int = 10):
+                return _gemini_call(f"สร้างแฟรการ์ด เกี่ยวกับ {context} มัธยมศึกษาปีที่ 5 \nจำนวน {amount} แฟรชการ์ด.", api_azure.flashcard_from_prompt)
+
+        return GAdapter()
+
+    # Default fallback
+    return api_azure
 
 def extract_flashcards(doc):
     fc = doc.get("flashcards")
@@ -34,7 +158,7 @@ def extract_flashcards(doc):
 # -----------------------------------------------------
 # Helper – placeholder OCR & LLM processing
 # -----------------------------------------------------
-async def _generate_flashcard(pdf_bytes: bytes = None, prompt: str = None, amount: int = 10):
+async def _generate_flashcard(pdf_bytes = None, prompt: Optional[str] = None, amount: int = 10, provider_adapter=None):
     if not pdf_bytes and not prompt:
         raise HTTPException(status_code=400, detail="Either PDF bytes or prompt must be provided")
     if pdf_bytes:
@@ -47,8 +171,8 @@ async def _generate_flashcard(pdf_bytes: bytes = None, prompt: str = None, amoun
         raise HTTPException(status_code=400, detail="No context available for flashcard generation")
     print(f"Generating {amount} flashcards for context: {context}")
 
-    #data = api_typhoon.generate_flashcards(topic=context, amount=amount)
-    data = api_azure.generate_flashcards(context=context, amount=amount)
+    adapter = provider_adapter or api_azure
+    data = adapter.generate_flashcards(context=context, amount=amount)
     print(data)
 
     return data
@@ -56,7 +180,7 @@ async def _generate_flashcard(pdf_bytes: bytes = None, prompt: str = None, amoun
 # -----------------------------------------------------
 # Helper – generate exam questions
 # -----------------------------------------------------
-async def _generate_exam(pdf_bytes: bytes = None, prompt: str = None, amount: int = 10):
+async def _generate_exam(pdf_bytes = None, prompt: Optional[str] = None, amount: int = 10, provider_adapter=None):
     if not pdf_bytes and not prompt:
         raise HTTPException(status_code=400, detail="Either PDF bytes or prompt must be provided")
     if pdf_bytes:
@@ -67,19 +191,23 @@ async def _generate_exam(pdf_bytes: bytes = None, prompt: str = None, amount: in
     if not context:
         raise HTTPException(status_code=400, detail="No context available for exam generation")
 
-    #questions = api_typhoon.generate_exam_questions(context=context, amount=amount)
-    questions = api_azure.generate_exam_questions(context=context, amount=amount)
+    adapter = provider_adapter or api_azure
+    questions = adapter.generate_exam_questions(context=context, amount=amount)
     return questions
 
 # -----------------------------------------------------
 # Routes
 # -------------------------------------------------ไ----
 
-@router.post("/flashcards/generate-pdf", response_model=List[Flashcard])
-async def generate_flashcards(
+@router.post("/flashcards/generate-pdf", response_model=List[Flashcard], dependencies=[Depends(rate_limit_dependency)])
+async def generate_flashcards_pdf(
     file: UploadFile = File(None, description="Optional PDF file to convert into flashcards"),
     amount: int = Query(10, ge=1, le=100, description="Number of flashcards to generate"),
     current_user: dict = Depends(get_current_user),
+    x_provider: str | None = Header(None, alias="X-Provider"),
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    x_model: str | None = Header(None, alias="X-Model"),
+    x_base_url: str | None = Header(None, alias="X-Base-Url"),
 ):
     """Upload a PDF, run OCR & LLM pipeline, and return generated flashcards."""
     if file.content_type != "application/pdf":
@@ -87,38 +215,56 @@ async def generate_flashcards(
 
     pdf_bytes = await file.read()
 
-    # Placeholder processing – user to implement
-    flashcards_data = await _generate_flashcard(pdf_bytes=pdf_bytes, amount=amount)
+    adapter = _choose_provider(x_provider, x_api_key, x_model, x_base_url)
+    flashcards_data = await _generate_flashcard(pdf_bytes=pdf_bytes, amount=amount, provider_adapter=adapter)
+    # Normalize to list
+    if isinstance(flashcards_data, dict) and "flashcards" in flashcards_data:
+        fc_list = flashcards_data["flashcards"]
+    elif isinstance(flashcards_data, list):
+        fc_list = flashcards_data
+    else:
+        raise HTTPException(status_code=502, detail="Unexpected flashcards response format")
 
     # Store history record
     record = {
         "user_id": str(current_user.get("_id") or current_user.get("id")),
         "filename": file.filename,
         "created_at": datetime.utcnow(),
-        "flashcards": flashcards_data,
+        "flashcards": fc_list,
     }
     result = await flashcards_collection.insert_one(record)
 
-    return flashcards_data['flashcards']
+    return fc_list
 
-@router.post("/flashcards/generate-text", response_model=List[Flashcard])
-async def generate_flashcards(
+@router.post("/flashcards/generate-text", response_model=List[Flashcard], dependencies=[Depends(rate_limit_dependency)])
+async def generate_flashcards_text(
     amount: int = Query(10, ge=1, le=100, description="Number of flashcards to generate"),
     prompt: str = Query(None, description="Optional prompt to guide flashcard generation"),
     current_user: dict = Depends(get_current_user),
+    x_provider: str | None = Header(None, alias="X-Provider"),
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    x_model: str | None = Header(None, alias="X-Model"),
+    x_base_url: str | None = Header(None, alias="X-Base-Url"),
 ):
 
-    flashcards_data = await _generate_flashcard(prompt=prompt, amount=amount)
+    adapter = _choose_provider(x_provider, x_api_key, x_model, x_base_url)
+    flashcards_data = await _generate_flashcard(prompt=prompt, amount=amount, provider_adapter=adapter)
+    if isinstance(flashcards_data, dict) and "flashcards" in flashcards_data:
+        fc_list = flashcards_data["flashcards"]
+    elif isinstance(flashcards_data, list):
+        fc_list = flashcards_data
+    else:
+        raise HTTPException(status_code=502, detail="Unexpected flashcards response format")
     
     record = {
         "user_id": str(current_user.get("_id") or current_user.get("id")),
         "prompt": prompt,
         "created_at": datetime.utcnow(),
-        "flashcards": flashcards_data,
+        "flashcards": fc_list,
     }
     result = await flashcards_collection.insert_one(record)
 
-    return flashcards_data['flashcards']
+    return fc_list
 
 @router.get("/flashcards/history", response_model=List[FlashcardRecordOut])
 async def list_flashcard_history(
@@ -153,11 +299,15 @@ async def list_flashcard_history(
 # Exam Generation Routes
 # -----------------------------------------------------
 
-@router.post("/exam/generate-pdf", response_model=List[ExamQuestion])
+@router.post("/exam/generate-pdf", response_model=List[ExamQuestion], dependencies=[Depends(rate_limit_dependency)])
 async def generate_exam_questions_pdf(
     file: UploadFile = File(None, description="Optional PDF file to convert into exam questions"),
     amount: int = Query(5, ge=1, le=100, description="Number of exam questions to generate"),
     current_user: dict = Depends(get_current_user),
+    x_provider: str | None = Header(None, alias="X-Provider"),
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    x_model: str | None = Header(None, alias="X-Model"),
+    x_base_url: str | None = Header(None, alias="X-Base-Url"),
 ):
     """Upload a PDF, run OCR & LLM pipeline, and return generated exam questions."""
     if file.content_type != "application/pdf":
@@ -165,7 +315,10 @@ async def generate_exam_questions_pdf(
 
     pdf_bytes = await file.read()
 
-    exam_data = await _generate_exam(pdf_bytes=pdf_bytes, amount=amount)
+    adapter = _choose_provider(x_provider, x_api_key, x_model, x_base_url)
+    exam_data = await _generate_exam(pdf_bytes=pdf_bytes, amount=amount, provider_adapter=adapter)
+    if not isinstance(exam_data, list):
+        raise HTTPException(status_code=502, detail="Unexpected exam response format")
 
     record = {
         "user_id": str(current_user.get("_id") or current_user.get("id")),
@@ -178,14 +331,19 @@ async def generate_exam_questions_pdf(
     return [ExamQuestion(id=str(i + 1), type="multiple_choice", question=q.get("question"), choices=q.get("options"), answer=q.get("correct_answer")) for i, q in enumerate(exam_data)]
 
 
-@router.post("/exam/generate-text", response_model=List[ExamQuestion])
+@router.post("/exam/generate-text", response_model=List[ExamQuestion], dependencies=[Depends(rate_limit_dependency)])
 async def generate_exam_questions_text(
     amount: int = Query(5, ge=1, le=100, description="Number of exam questions to generate"),
     prompt: str = Query(None, description="Optional prompt to guide exam question generation"),
     current_user: dict = Depends(get_current_user),
+    x_provider: str | None = Header(None, alias="X-Provider"),
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    x_model: str | None = Header(None, alias="X-Model"),
+    x_base_url: str | None = Header(None, alias="X-Base-Url"),
 ):
     """Generate exam questions based on a text prompt."""
-    exam_data = await _generate_exam(prompt=prompt, amount=amount)
+    adapter = _choose_provider(x_provider, x_api_key, x_model, x_base_url)
+    exam_data = await _generate_exam(prompt=prompt, amount=amount, provider_adapter=adapter)
     
     # Ensure that exam_data is iterable (i.e. a list)
     if not isinstance(exam_data, list):
