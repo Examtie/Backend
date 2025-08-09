@@ -19,6 +19,7 @@ Act as an expert multiple-choice question generator for educational purposes.
 
 # PROMPT:
 You are provided with a context. Based on the context, generate 5 multiple-choice questions. Each question should have 4 answer options, with only one correct answer. Structure your response in JSON format. Cover latex equation in $...$ (for example, $x=e^2$)
+To use LaTeX cover the equations with $....$ - for example, $e^x$ 
 
 # CONTEXT:
 [Context]
@@ -76,6 +77,7 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
 YOU CAN USE ANY LANGUAGE NOT ONLY ENGLISH
 
 You are an advanced flashcard creator specializing in graduate and post-graduate level content. high-quality flashcards on the given topic. Follow these guidelines:
+To use LaTeX cover the equations with $....$ - for example, $e^x$ 
 
 # INSTRUCTIONS:
   1. Check the context language and create flashcards in that language.
