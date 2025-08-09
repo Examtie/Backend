@@ -141,11 +141,14 @@ class BookmarkOut(BaseModel):
     created_at: datetime
 
 class ExamQuestion(BaseModel):
+    exam_id: Optional[str] = None  # For public questions, exam_id is not required
     id: str
     type: Literal["multiple_choice", "fill", "essay"]
     question: str
     choices: Optional[List[str]] = None  # for multiple_choice
     answer: Optional[Union[str, List[str]]] = None  # สำหรับเฉลย (admin)
+    why_answer_this_one: Optional[str] = None
+    what_do_i_read: Optional[str] = None
     
 class ExamRecordOut(BaseModel):
     id: str

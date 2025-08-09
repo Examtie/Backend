@@ -13,16 +13,18 @@ class Azzzure_API:
         )
         self.model = Azure_Model
         self.pdf_to_exam_system = """
+- If You are useing LaTex You need to cover Latex in $ Front and the End Of the Equations
 # ROLE:
 Act as an expert multiple-choice question generator for educational purposes.
 
 # PROMPT:
-You are provided with a context. Based on the context, generate 5 multiple-choice questions. Each question should have 4 answer options, with only one correct answer. Structure your response in JSON format.
+You are provided with a context. Based on the context, generate 5 multiple-choice questions. Each question should have 4 answer options, with only one correct answer. Structure your response in JSON format. Cover latex equation in $...$ (for example, $x=e^2$)
 
 # CONTEXT:
 [Context]
 
 # INSTRUCTIONS:
+- If You are useing LaTex You need to cover Latex in $ Front and the End Of the Equations
 - Each question must have **4 answer options** labeled **A, B, C, D**, with **one correct** answers.
 - Ensure the questions comprehensively cover the key details from the context.
 - **Do not repeat** questions or options across the generated set.
@@ -36,7 +38,9 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
 # IMPORTANT:
 - **Language** in Exam Question and Choice Depends On Context Language
 - For MATH Equations Use **LaTeX** for **Math Equation** Or **Any Equation** Use **LaTeX** Instead Of Normal English and Number
-
+- If You are useing LaTex You need to cover Latex in $ Front and the End Of the Equations
+- Explain how to solve the question or equation in field `why_answer_this_one`
+- Explain If i want to Do this Question or Equation in `what_do_i_read`  what do i need to read more or do more practice
 
 # JSON FORMAT:
 [
@@ -48,6 +52,8 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
             "C) Option text",
             "D) Option text"
         ],
+        "why_answer_this_one": "Explanation here",
+        "what_do_i_read": "Explanation here",
         "correct_answer": "A"
     },
     {
@@ -58,6 +64,8 @@ You are provided with a context. Based on the context, generate 5 multiple-choic
             "C) Option text",
             "D) Option text"
         ],
+        "why_answer_this_one": "Explanation here",
+        "what_do_i_read": "Explanation here",
         "correct_answer": "B"
     },
 ]
@@ -83,7 +91,7 @@ You are an advanced flashcard creator specializing in graduate and post-graduate
 # IMPORTANT
     - **Language** in Flashcard Question and Answer Depends On Context Language in FRONT AND BACK OF THE FLASHCARD THE WHOLE FLASHCARD DEPENDS ON CONTEXT LANGUAGE
     - Generate Flashcards and NOT exams.
-    - For MATH Equations Use **LaTeX** for **Math Equation** Or **Any Equation** Use **LaTeX** Instead Of Normal English Letters and Number
+    - For MATH Equations Use **LaTeX** for **Math Equation** Or **Any Equation** Use **LaTeX** Instead Of Normal English Letters and Number. To use LaTeX cover the equation with $...$
 
 # CONTEXT:
 [Context]
@@ -109,6 +117,7 @@ Answer: "Confirmation bias"
 
 
     def ai_azure(self, prompt: str, system_prompt: str) -> str:
+        print(system_prompt)
         completion = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -131,6 +140,7 @@ Answer: "Confirmation bias"
             return False
     
     def generate_exam_questions(self, context: str, amount: int = 10) -> str:
+        print("you changede")
         #prompt = f"สร้างข้อสอบจำนวน  {amount} ข้อ และข้อสอบเนื้อหาเกี่ยวกับ : {context}"
         return self.ai_azure(f"สร้างข้อสอบจำนวน  {amount} ข้อ และข้อสอบเนื้อหาเกี่ยวกับ : {context}", self.pdf_to_exam_system)
     
